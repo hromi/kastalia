@@ -1,0 +1,103 @@
+<!doctype html>
+<%include modules/brahma.tt%>
+<% INCLUDE modules/graph_seo_head.tt skip_basic=1 %>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/kolleg.css">
+<style>
+:root{
+	--bg: <%if knot.kolleg_bg%><%knot.kolleg_bg%><%else%>#070706<%end%>;
+	--ink: <%if knot.kolleg_ink%><%knot.kolleg_ink%><%else%>#ece3cf<%end%>;
+	--dim: <%if knot.kolleg_dim%><%knot.kolleg_dim%><%else%>#8c8371<%end%>;
+	--accent: <%if knot.kolleg_accent%><%knot.kolleg_accent%><%else%>#c6a15b<%end%>;
+	--display: 'Cinzel', <%if knot.font%>'<%knot.font%>',<%end%> Georgia, serif;
+	--body: <%if knot.font%>'<%knot.font%>',<%end%> 'Cormorant Garamond', Georgia, serif;
+}
+body{min-height:100dvh;}
+
+header{
+	max-width:72rem;margin:0 auto;
+	padding:clamp(4.5rem,10vw,7rem) clamp(1.5rem,5vw,3rem) clamp(2rem,5vw,3rem);
+	text-align:center;
+}
+.breadcrumb{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:1rem;}
+.breadcrumb a{color:var(--dim);}
+.breadcrumb a:hover{color:var(--accent);}
+header h1{font-size:clamp(2rem,5vw,3.6rem);line-height:1.15;}
+header .rule{margin:1.1rem auto 0;}
+header .abstract{max-width:60ch;margin:1.6rem auto 0;color:var(--dim);font-style:italic;font-size:clamp(1rem,1.4vw,1.25rem);}
+
+main{max-width:72rem;margin:0 auto;padding:0 clamp(1.5rem,5vw,3rem) 6rem;}
+.grid{
+	display:grid;
+	grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));
+	gap:clamp(1.2rem,2.5vw,2rem);
+}
+
+.card{
+	position:relative;
+	border:1px solid rgba(198,161,91,.25);
+	padding:1.4rem 1.5rem 1.6rem;
+	display:flex;flex-direction:column;gap:.7rem;
+	transition:border-color .2s ease,transform .2s ease;
+}
+.card:hover{border-color:var(--accent);transform:translateY(-2px);}
+.card .thumb{border:1px solid rgba(198,161,91,.5);padding:6px;align-self:flex-start;max-width:9rem;}
+.card .thumb img{display:block;width:100%;height:auto;aspect-ratio:3/4;object-fit:cover;filter:grayscale(1) contrast(1.15) brightness(.92) sepia(.12);}
+.card .kicker{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);}
+.card h2{font-size:1.35rem;line-height:1.25;}
+.card h2 a{color:var(--ink);}
+.card h2 a::after{content:"";position:absolute;inset:0;}
+.card .excerpt{font-size:1rem;line-height:1.5;color:var(--dim);flex:1;}
+.card .meta{display:flex;align-items:center;justify-content:space-between;gap:.8rem;font-size:.76rem;color:var(--dim);letter-spacing:.02em;}
+.card .meta .rec{color:var(--accent);}
+.card .meta a{position:relative;z-index:1;color:var(--dim);}
+.card .meta a:hover{color:var(--accent);}
+
+.empty{text-align:center;color:var(--dim);font-style:italic;padding:4rem 1rem;}
+
+.gn-breadcrumb{display:block;position:static;max-width:none;white-space:normal;opacity:.75;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin:0 0 1rem;}
+.gn-altpaths{position:static;max-width:none;margin:.3rem 0 0;}
+main .gn-related{max-width:72rem;margin:0 auto 3rem;padding:1.2rem clamp(1.5rem,5vw,3rem) 0;border-top:1px solid rgba(198,161,91,.25);}
+</style>
+<body>
+	<header>
+		<% INCLUDE modules/graph_breadcrumb.tt %>
+		<% ancestors = knot.knot_name.split('/') %>
+		<h1><% ancestors.last %><span class="rule"></span></h1>
+		<% if knot.knot_content %><div class="abstract"><% knot.knot_content %></div><% end %>
+	</header>
+
+	<main>
+		<% children = knot.knot_id.get_children %>
+		<% if children.size %>
+		<div class="grid">
+			<% FOREACH child IN children %>
+				<div class="card">
+					<% if child.img_url %>
+					<figure class="thumb"><img src="<% child.img_url %>" alt="<% child.img_legend %>" loading="lazy"/></figure>
+					<% end %>
+					<% if child.date %><div class="kicker"><% child.date %></div><% end %>
+					<h2><a href="/<% child.knot_id %>/kolleg"><% child.knot_name.short_name %></a></h2>
+					<% if child.knot_content %><div class="excerpt"><% child.knot_content.remove_html_tags | truncate(180) %></div><% end %>
+					<div class="meta">
+						<% if child.ogg_url %><span class="rec">&#9679; recording</span><% else %><span></span><% end %>
+						<a href="/<% child.knot_id %>/semester">↳ browse contents</a>
+					</div>
+				</div>
+			<% END %>
+		</div>
+		<% else %>
+		<div class="empty">no sessions catalogued here yet</div>
+		<% end %>
+		<% INCLUDE modules/graph_related.tt %>
+	</main>
+
+	<div id="colophon">
+		<% if knot.author %><% knot.author %><% end %><% if knot.licence %> &middot; <% knot.licence %><% end %>
+	</div>
+
+	<img id="brand" src="<% if knot.logo %><% knot.logo %><% else %>/images/udk_logo.svg<% end %>" alt=""/>
+</body>
+</html>

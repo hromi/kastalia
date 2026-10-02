@@ -1,0 +1,71 @@
+/* shared look for the kolleg/semester template family: near-black, high
+   contrast, Cinzel + Cormorant Garamond. Each view's own <style> block sets
+   :root custom properties (per-knot overridable) plus its own layout. */
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;min-height:100%;background:var(--bg);}
+body{
+	font-family:var(--body);
+	color:var(--ink);
+	-webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+
+h1,h2,h3{font-family:var(--display);font-weight:600;letter-spacing:.02em;margin:0;}
+
+.rule{display:block;width:3.2rem;height:2px;background:var(--accent);margin-top:.85rem;}
+
+.pill-btn{
+	background:none;border:1px solid rgba(198,161,91,.35);color:var(--ink);
+	border-radius:999px;cursor:pointer;font-size:.78rem;line-height:1;
+	padding:.5rem .9rem;opacity:.6;transition:opacity .2s ease,border-color .2s ease;
+	font-family:var(--body);
+}
+.pill-btn:hover{opacity:1;border-color:var(--accent);}
+
+.gn-breadcrumb{
+	position:fixed;top:.9rem;left:1.1rem;z-index:55;max-width:66vw;
+	font-size:.72rem;letter-spacing:.03em;color:var(--dim);opacity:.6;
+	white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+	transition:opacity .2s ease,white-space .2s ease;
+}
+.gn-breadcrumb:hover{opacity:1;white-space:normal;}
+.gn-breadcrumb a{color:var(--dim);}
+.gn-breadcrumb a:hover{color:var(--accent);}
+.gn-breadcrumb .gn-sep{margin:0 .35em;opacity:.5;}
+.gn-breadcrumb .gn-current{color:var(--ink);}
+.gn-altpaths{
+	position:fixed;top:2.1rem;left:1.1rem;z-index:55;max-width:60vw;
+	font-size:.64rem;color:var(--dim);opacity:.45;margin:0;
+}
+
+.gn-related{
+	border-top:1px solid rgba(198,161,91,.25);
+	margin-top:2rem;padding-top:1.2rem;
+}
+.gn-related-h{font-size:.78rem;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);margin-bottom:.6rem;}
+.gn-related ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.35rem;}
+.gn-related li{font-size:.88rem;color:var(--dim);}
+.gn-related em{font-style:italic;color:var(--accent);}
+.gn-related a{color:var(--ink);}
+.gn-related a:hover{color:var(--accent);}
+.gn-rel-dir{opacity:.6;}
+
+#colophon{
+	position:fixed;bottom:.7rem;right:1rem;max-width:60vw;z-index:55;
+	font-size:.68rem;letter-spacing:.02em;color:var(--dim);opacity:.4;
+	text-align:right;transition:opacity .2s ease;
+}
+#colophon:hover{opacity:.9;}
+
+#brand{
+	position:fixed;bottom:.9rem;left:1.1rem;height:2rem;z-index:55;
+	opacity:.5;filter:brightness(1.4) contrast(.7) grayscale(1);
+}
+
+#toolbelt{
+	position:fixed;top:.9rem;right:1.1rem;z-index:60;
+	display:flex;align-items:center;gap:.6rem;
+}
+#toolbelt [hidden]{display:none;}
+#toolbelt input[type=range]{accent-color:var(--accent);vertical-align:middle;width:9rem;}

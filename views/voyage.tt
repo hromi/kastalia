@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><% knot.knot_name %> :: voyage</title>
+<% INCLUDE modules/graph_seo_head.tt %>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&display=swap" rel="stylesheet">
+<style>
+:root{ --sea:#0b3d4c; --sea-deep:#062732; --sand:#e9d9b8; --coral:#d97a5f; }
+*{box-sizing:border-box;}
+html,body{margin:0;}
+body{
+	background:linear-gradient(180deg, var(--sea) 0%, var(--sea-deep) 100%);
+	color:var(--sand);
+	font-family:'Fraunces',Georgia,serif;
+	padding:0 1rem 5rem;
+}
+header{text-align:center;padding:clamp(2.5rem,7vw,4rem) 1rem 1.5rem;}
+header h1{font-size:clamp(1.8rem,5vw,3rem);font-weight:700;margin:0;letter-spacing:.01em;}
+header .compass{font-size:1.6rem;opacity:.8;margin-bottom:.4rem;}
+header .abstract{max-width:50ch;margin:1rem auto 0;font-style:italic;color:#c9dbe0;font-size:1.02rem;}
+
+.route{max-width:640px;margin:2rem auto 0;position:relative;padding-left:2.2rem;}
+.route::before{
+	content:"";position:absolute;left:.55rem;top:.4rem;bottom:.4rem;width:2px;
+	background:repeating-linear-gradient(to bottom, var(--coral) 0 6px, transparent 6px 12px);
+}
+.port{position:relative;margin-bottom:2rem;}
+.port::before{
+	content:"\2693";position:absolute;left:-2.2rem;top:-.1rem;
+	font-size:1.1rem;color:var(--coral);
+}
+.day{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:#8fb0b8;}
+.port h2{margin:.15rem 0 .25rem;font-size:1.25rem;}
+.port h2 a{color:var(--sand);text-decoration:none;border-bottom:1px solid rgba(233,217,184,.4);}
+.port h2 a:hover{border-color:var(--coral);color:#fff;}
+.excerpt{margin:0;color:#c9dbe0;font-size:.95rem;}
+.empty{text-align:center;color:#8fb0b8;font-style:italic;padding:3rem 0;}
+.gn-breadcrumb{position:static;max-width:none;white-space:normal;opacity:.85;color:#c9dbe0;font-size:.82rem;display:block;margin-top:.6rem;}
+.gn-breadcrumb a{color:var(--sand);}
+.gn-breadcrumb .gn-current{color:#fff;}
+.gn-altpaths{position:static;max-width:none;color:#8fb0b8;font-size:.72rem;}
+</style>
+</head>
+<body>
+<header>
+	<div class="compass">&#9992;</div>
+	<h1><% knot.knot_name.short_name %></h1>
+	<% if knot.knot_content %><p class="abstract"><% knot.knot_content.remove_html_tags %></p><% end %>
+	<% INCLUDE modules/graph_breadcrumb.tt %>
+</header>
+
+<div class="route">
+<% log = knot.knot_id.get_chronological('asc', 60) %>
+<% FOREACH l IN log %>
+	<div class="port">
+		<div class="day"><% if l.date %><% l.date %><% else %>log entry<% end %></div>
+		<h2><a href="/<% l.knot_id %>.html"><% l.knot_name.short_name %></a></h2>
+		<% if l.knot_content %><p class="excerpt"><% l.knot_content.remove_html_tags | truncate(160) %></p><% end %>
+	</div>
+<% END %>
+<% IF !log.size %><div class="empty">the ship has not yet left port</div><% END %>
+</div>
+</body>
+</html>

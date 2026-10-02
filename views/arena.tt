@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><% knot.knot_name %> :: arena</title>
+<% INCLUDE modules/graph_seo_head.tt %>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Archivo:ital,wght@0,400;0,600&display=swap" rel="stylesheet">
+<style>
+:root{ --sky:#1b5e8c; --steppe:#c94f3d; --gold:#e0a933; --felt:#14212b; --paper:#fbf4e4; }
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--felt);color:var(--paper);}
+body{font-family:'Archivo',sans-serif;padding-bottom:4rem;}
+header{
+	background:linear-gradient(135deg, var(--steppe), var(--sky));
+	padding:clamp(2.2rem,6vw,3.5rem) 1.5rem 2.2rem;
+	text-align:center;
+	border-bottom:6px solid var(--gold);
+}
+header h1{
+	font-family:'Oswald',sans-serif;
+	font-weight:700;
+	text-transform:uppercase;
+	letter-spacing:.06em;
+	font-size:clamp(1.8rem,5vw,3rem);
+	margin:0;
+	color:var(--paper);
+	text-shadow:0 3px 0 rgba(0,0,0,.25);
+}
+header .abstract{max-width:56ch;margin:.9rem auto 0;color:#fce7cf;font-size:1.02rem;}
+
+main{max-width:760px;margin:0 auto;padding:0 1.2rem;}
+.heat{
+	display:flex;align-items:center;gap:1rem;
+	padding:1rem .4rem;
+	border-bottom:1px solid rgba(255,255,255,.12);
+}
+.heat:hover{background:rgba(255,255,255,.04);}
+.rank{
+	font-family:'Oswald',sans-serif;font-weight:700;font-size:1.6rem;
+	width:3ch;text-align:center;color:var(--gold);flex-shrink:0;
+}
+.heat:nth-child(1) .rank, .heat:nth-child(2) .rank, .heat:nth-child(3) .rank{font-size:2rem;}
+.medal{font-size:1.3em;margin-right:.1em;}
+.name{flex:1;min-width:0;}
+.name a{color:var(--paper);text-decoration:none;font-weight:600;font-size:1.08rem;}
+.name a:hover{color:var(--gold);}
+.excerpt{display:block;font-size:.82rem;color:#b9c3cc;font-weight:400;margin-top:.15rem;}
+.date{font-size:.78rem;color:#8ea0ac;white-space:nowrap;}
+.empty{text-align:center;color:#8ea0ac;padding:3rem 0;font-style:italic;}
+.gn-breadcrumb{position:static;max-width:none;white-space:normal;opacity:.85;color:#fce7cf;font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;display:block;margin-top:.6rem;}
+.gn-breadcrumb a{color:#fce7cf;}
+.gn-breadcrumb .gn-current{color:var(--gold);}
+.gn-altpaths{position:static;max-width:none;color:#fce7cf;opacity:.7;font-size:.7rem;}
+.gn-related{max-width:760px;margin:2.5rem auto 0;padding:0 1.2rem;}
+.gn-related-h{font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);font-size:.85rem;border-bottom:2px solid var(--gold);padding-bottom:.4rem;}
+.gn-related ul{list-style:none;margin:0;padding:0;}
+.gn-related li{padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.08);color:#b9c3cc;}
+.gn-related em{font-style:normal;color:var(--steppe);}
+.gn-related a{color:var(--paper);font-weight:600;}
+.gn-related a:hover{color:var(--gold);}
+</style>
+</head>
+<body>
+<header>
+	<h1><% knot.knot_name.short_name %></h1>
+	<% if knot.knot_content %><p class="abstract"><% knot.knot_content.remove_html_tags %></p><% end %>
+	<% INCLUDE modules/graph_breadcrumb.tt %>
+</header>
+<main>
+<% children = knot.knot_id.get_children %>
+<% i = 0 %>
+<% FOREACH c IN children %>
+	<% i = i + 1 %>
+	<div class="heat">
+		<div class="rank"><% if i == 1 %><span class="medal">&#129351;</span><% elsif i == 2 %><span class="medal">&#129352;</span><% elsif i == 3 %><span class="medal">&#129353;</span><% else %><% i %><% end %></div>
+		<div class="name">
+			<a href="/<% c.knot_id %>.html"><% c.knot_name.short_name %></a>
+			<% if c.knot_content %><span class="excerpt"><% c.knot_content.remove_html_tags | truncate(90) %></span><% end %>
+		</div>
+		<% if c.date %><div class="date"><% c.date %></div><% end %>
+	</div>
+<% END %>
+<% IF !children.size %><div class="empty">no contenders have entered the arena yet</div><% END %>
+</main>
+<% INCLUDE modules/graph_related.tt gn_related_title="Other rivalries" %>
+</body>
+</html>

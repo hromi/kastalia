@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><% knot.knot_name %> :: ledger</title>
+<% INCLUDE modules/graph_seo_head.tt %>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{ --paper:#f4f1e6; --line:#b8cdb5; --ink:#243424; --accent:#8a6d2f; }
+*{box-sizing:border-box;}
+html,body{margin:0;background:#dfe6da;color:var(--ink);}
+body{font-family:'Spectral',Georgia,serif;padding:1.6rem 1rem 4rem;}
+.book{
+	max-width:980px;margin:0 auto;background:var(--paper);
+	background-image:repeating-linear-gradient(to bottom, transparent 0 2.1em, var(--line) 2.1em calc(2.1em + 1px));
+	border:1px solid #c9bd9a;box-shadow:0 12px 30px rgba(0,0,0,.15);
+	padding:2.2rem clamp(1rem,4vw,3rem);
+}
+header{text-align:center;margin-bottom:1.6rem;}
+header h1{margin:0;font-size:clamp(1.6rem,5vw,2.4rem);letter-spacing:.02em;}
+header .abstract{font-style:italic;color:#4a5c43;margin-top:.3rem;}
+.columns{display:grid;grid-template-columns:1fr 1fr;gap:0 2rem;}
+@media (max-width:700px){.columns{grid-template-columns:1fr;}}
+.col h2{
+	font-size:.85rem;text-transform:uppercase;letter-spacing:.12em;
+	color:var(--accent);border-bottom:2px solid var(--accent);padding-bottom:.3rem;margin-bottom:.2rem;
+}
+.entry{display:flex;justify-content:space-between;gap:.8rem;padding:.15em 0;line-height:2.1em;}
+.entry .who{min-width:0;}
+.entry .who a{color:var(--ink);text-decoration:none;border-bottom:1px dotted var(--accent);}
+.entry .who a:hover{color:var(--accent);}
+.entry .predicate{color:#6b7a63;font-size:.82em;font-style:italic;white-space:nowrap;}
+.empty{color:#7a8773;font-style:italic;}
+footer{text-align:center;margin-top:2rem;font-size:.8rem;color:#6b7a63;}
+.gn-breadcrumb{position:static;max-width:none;white-space:normal;opacity:1;color:#6b7a63;font-size:.82rem;display:block;margin-top:.4rem;}
+.gn-breadcrumb a{color:var(--accent);}
+.gn-breadcrumb .gn-current{color:var(--ink);}
+.gn-altpaths{position:static;max-width:none;color:#6b7a63;font-size:.72rem;}
+</style>
+</head>
+<body>
+<div class="book">
+<header>
+	<h1><% knot.knot_name.short_name %></h1>
+	<% if knot.knot_content %><p class="abstract"><% knot.knot_content.remove_html_tags %></p><% end %>
+	<% INCLUDE modules/graph_breadcrumb.tt %>
+</header>
+<div class="columns">
+	<div class="col">
+		<h2>Gives &rarr;</h2>
+		<% gives = objects %>
+		<% FOREACH g IN gives %>
+			<div class="entry"><span class="who"><a href="/<% g.object_id %>.html"><% g.object_name.short_name %></a></span><span class="predicate"><% g.predicate %></span></div>
+		<% END %>
+		<% IF !gives.size %><p class="empty">nothing recorded</p><% END %>
+	</div>
+	<div class="col">
+		<h2>&larr; Receives</h2>
+		<% receives = subjects %>
+		<% FOREACH r IN receives %>
+			<div class="entry"><span class="who"><a href="/<% r.subject_id %>.html"><% r.subject_name.short_name %></a></span><span class="predicate"><% r.predicate %></span></div>
+		<% END %>
+		<% IF !receives.size %><p class="empty">nothing recorded</p><% END %>
+	</div>
+</div>
+</div>
+<footer>a ledger of what passes between knots, not just what contains what</footer>
+</body>
+</html>

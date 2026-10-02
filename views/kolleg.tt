@@ -1,0 +1,339 @@
+<!doctype html>
+<%include modules/brahma.tt%>
+<% INCLUDE modules/graph_seo_head.tt skip_basic=1 %>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/kolleg.css">
+<style>
+:root{
+	--bg: <%if knot.kolleg_bg%><%knot.kolleg_bg%><%else%>#070706<%end%>;
+	--ink: <%if knot.kolleg_ink%><%knot.kolleg_ink%><%else%>#ece3cf<%end%>;
+	--dim: <%if knot.kolleg_dim%><%knot.kolleg_dim%><%else%>#8c8371<%end%>;
+	--accent: <%if knot.kolleg_accent%><%knot.kolleg_accent%><%else%>#c6a15b<%end%>;
+	--display: 'Cinzel', <%if knot.font%>'<%knot.font%>',<%end%> Georgia, serif;
+	--body: <%if knot.font%>'<%knot.font%>',<%end%> 'Cormorant Garamond', Georgia, serif;
+}
+body{overflow:hidden;}
+#progress{position:fixed;top:0;left:0;right:0;height:3px;background:rgba(255,255,255,.06);z-index:60;}
+#progress-fill{height:100%;width:0%;background:var(--accent);transition:width .45s ease;}
+
+.folio{
+	position:fixed;inset:0;
+	display:grid;
+	grid-template-columns:clamp(220px,28vw,420px) 1fr;
+	gap:clamp(1.5rem,4vw,4rem);
+	align-items:center;
+	padding:clamp(1.5rem,5vw,6rem);
+	height:100dvh;height:100vh;
+	opacity:0;visibility:hidden;pointer-events:none;
+	transform:translateY(10px);
+	transition:opacity .5s ease,transform .5s ease;
+}
+.folio.active{opacity:1;visibility:visible;pointer-events:auto;transform:none;}
+@media (max-width:760px){
+	.folio{grid-template-columns:1fr;grid-auto-rows:min-content;padding:1.25rem;gap:1rem;overflow-y:auto;align-content:start;align-items:start;padding-top:3rem;}
+	.engraving{max-height:38vh;margin-inline:auto;}
+}
+
+.folio-text{min-width:0;}
+.folio-text.solo{grid-column:1/-1;max-width:64ch;margin-inline:auto;}
+
+.folio h1{font-size:clamp(1.5rem,3.2vw,2.9rem);line-height:1.18;margin:0 0 clamp(.9rem,2.2vw,1.8rem);}
+
+.folio-content{font-size:clamp(1.05rem,1.55vw,1.5rem);line-height:1.5;font-weight:400;}
+.folio-content p{margin:0 0 1em;}
+.folio-content strong{color:var(--accent);font-weight:600;}
+.folio-content em{font-style:italic;color:var(--dim);}
+.folio-content .fragment{opacity:0;transform:translateY(6px);transition:opacity .35s ease,transform .35s ease;}
+.folio-content .fragment.shown{opacity:1;transform:none;}
+
+.engraving{position:relative;border:1px solid rgba(198,161,91,.55);padding:10px;}
+.engraving::before{content:"";position:absolute;inset:5px;border:1px solid rgba(198,161,91,.28);pointer-events:none;}
+.engraving img{display:block;width:100%;height:auto;aspect-ratio:3/4;object-fit:cover;filter:grayscale(1) contrast(1.15) brightness(.92) sepia(.12);}
+.engraving.raw img{filter:none;}
+.engraving figcaption{margin-top:.6rem;font-size:.72rem;color:var(--dim);font-style:italic;text-align:center;}
+.engraving.media{aspect-ratio:16/10;padding:0;border-width:2px;}
+.engraving.media iframe,.engraving.media video{display:block;width:100%;height:100%;aspect-ratio:16/10;border:0;filter:none;}
+
+.cover{grid-template-columns:none;text-align:center;justify-items:center;align-content:center;}
+.cover h1{font-size:clamp(2rem,5vw,4.4rem);}
+.cover .rule{margin-inline:auto;}
+.cover .abstract{max-width:56ch;color:var(--dim);font-style:italic;font-size:clamp(1rem,1.4vw,1.3rem);margin-bottom:2rem;}
+.cover .byline{font-size:clamp(.85rem,1.1vw,1.05rem);color:var(--dim);letter-spacing:.03em;}
+.cover .byline strong{color:var(--ink);font-weight:600;}
+.cover .hint{margin-top:3rem;font-size:.75rem;color:var(--dim);opacity:.6;text-transform:uppercase;letter-spacing:.15em;}
+
+#nav{position:fixed;bottom:1.4rem;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:1rem;z-index:60;font-size:.8rem;color:var(--dim);}
+#nav button{background:none;border:1px solid rgba(198,161,91,.35);color:var(--ink);width:2.2rem;height:2.2rem;border-radius:50%;cursor:pointer;font-size:1.1rem;line-height:1;opacity:.55;transition:opacity .2s ease,border-color .2s ease;}
+#nav button:hover{opacity:1;border-color:var(--accent);}
+#counter{min-width:4.5rem;text-align:center;letter-spacing:.05em;}
+.gn-altpaths{display:none;}
+</style>
+<body>
+	<div id="progress"><div id="progress-fill"></div></div>
+
+	<% INCLUDE modules/graph_breadcrumb.tt %>
+
+	<div id="toolbelt">
+		<% if login %>
+		<button id="rec-start" class="pill-btn" title="record this session">&#9679; record</button>
+		<button id="rec-stop" class="pill-btn" hidden title="stop recording">&#9632; stop</button>
+		<% end %>
+		<% if knot.presentation_timeline and knot.ogg_url %>
+		<button id="play-start" class="pill-btn" title="play recorded session">&#9654; recording</button>
+		<button id="play-pause" class="pill-btn" hidden title="pause">&#10074;&#10074; pause</button>
+		<input type="range" id="play-slider" min="0" max="100" value="0" disabled/>
+		<% end %>
+	</div>
+
+	<div id="deck">
+		<section class="folio cover" data-index="0" id="folio-<% knot.knot_id %>">
+			<h1><% ancestors = knot.knot_name.split('/') %><% ancestors.last %><span class="rule"></span></h1>
+			<% if knot.knot_content %><div class="abstract"><% knot.knot_content %></div><% end %>
+			<div class="byline">
+				<% if knot.author %><strong><% knot.author %></strong><% end %>
+				<% if knot.affiliation %> &middot; <% knot.affiliation %><% end %>
+				<% if knot.conference %><br/>presented at <% knot.conference %><% end %>
+				<% if knot.licence %><br/><% knot.licence %><% if knot.doi %> &middot; doi:<a href="https://dx.doi.org/<%knot.doi%>"><%knot.doi%></a><% end %><% end %>
+			</div>
+			<div class="hint">click, swipe or press &rarr; to begin</div>
+		</section>
+
+		<% slides = knot.knot_id.get_full_deck %>
+		<% i = 0 %>
+		<% FOREACH slide IN slides %>
+			<% i = i + 1 %>
+			<section class="folio" data-index="<% i %>" id="folio-<% slide.knot_id %>">
+				<% has_media = slide.img_url or slide.youtube_url or slide.video_url %>
+				<% if slide.img_url %>
+					<figure class="engraving<% if slide.raw_img %> raw<% end %>">
+						<img src="<% slide.img_url %>" alt="<% slide.img_legend %>" loading="lazy"/>
+						<% if slide.img_legend %><figcaption><% slide.img_legend %></figcaption><% end %>
+					</figure>
+				<% elsif slide.youtube_url %>
+					<figure class="engraving media">
+						<iframe src="<% slide.youtube_url %>" loading="lazy" allowfullscreen></iframe>
+					</figure>
+				<% elsif slide.video_url %>
+					<figure class="engraving media">
+						<video src="<% slide.video_url %>" controls></video>
+					</figure>
+				<% end %>
+				<div class="folio-text<% unless has_media %> solo<% end %>">
+					<h1><% slide.knot_name.short_name %><span class="rule"></span></h1>
+					<div class="folio-content"><% slide.knot_content %></div>
+				</div>
+			</section>
+		<% END %>
+	</div>
+
+	<nav id="nav">
+		<button id="prev" aria-label="Previous">&#8249;</button>
+		<span id="counter"></span>
+		<button id="next" aria-label="Next">&#8250;</button>
+	</nav>
+
+	<div id="colophon">
+		<% if knot.author %><% knot.author %><% end %><% if knot.conference %> &middot; <% knot.conference %><% end %><% if knot.licence %> &middot; <% knot.licence %><% end %>
+	</div>
+
+	<img id="brand" src="<% if knot.logo %><% knot.logo %><% else %>/images/udk_logo.svg<% end %>" alt=""/>
+
+<script>
+(function(){
+	var folios = Array.prototype.slice.call(document.querySelectorAll('.folio'));
+	var total = folios.length;
+	var current = 0;
+	var presentation_timeline = [];
+	var recordingStartedAt = null;
+	var folioIndexById = {};
+	folios.forEach(function(f, idx){ if (f.id) folioIndexById[f.id] = idx; });
+
+	function fragmentsOf(folio){
+		return Array.prototype.slice.call(folio.querySelectorAll('.fragment'));
+	}
+
+	function logEvent(eventType, parameters){
+		if (!recordingStartedAt) return;
+		var folio = folios[current];
+		presentation_timeline.push({
+			eventType: eventType,
+			parameters: parameters,
+			timeElapsed: (new Date() - recordingStartedAt) / 1000,
+			folioId: folio ? folio.id : null,
+			source: 'kolleg'
+		});
+	}
+
+	function render(){
+		var pct = total > 1 ? (current / (total - 1) * 100) : 100;
+		document.getElementById('progress-fill').style.width = pct + '%';
+		document.getElementById('counter').textContent = (current + 1) + ' / ' + total;
+		history.replaceState(null, '', '#' + (current + 1));
+	}
+
+	function showFolio(i, allFragmentsShown){
+		current = Math.max(0, Math.min(total - 1, i));
+		folios.forEach(function(f, idx){ f.classList.toggle('active', idx === current); });
+		fragmentsOf(folios[current]).forEach(function(f){
+			f.classList.toggle('shown', !!allFragmentsShown);
+		});
+		logEvent('slidechanged', {slide: current});
+		render();
+	}
+
+	function nextStep(){
+		var frags = fragmentsOf(folios[current]);
+		var hidden = frags.filter(function(f){ return !f.classList.contains('shown'); });
+		if (hidden.length){
+			var idx = frags.indexOf(hidden[0]);
+			hidden[0].classList.add('shown');
+			logEvent('fragmentshown', {slide: current, f: idx});
+			return;
+		}
+		if (current < total - 1){ showFolio(current + 1, false); }
+	}
+	function prevStep(){
+		var frags = fragmentsOf(folios[current]);
+		var shown = frags.filter(function(f){ return f.classList.contains('shown'); });
+		if (shown.length){
+			var idx = frags.indexOf(shown[shown.length - 1]);
+			shown[shown.length - 1].classList.remove('shown');
+			logEvent('fragmenthidden', {slide: current, f: idx});
+			return;
+		}
+		if (current > 0){ showFolio(current - 1, true); }
+	}
+
+	document.getElementById('next').addEventListener('click', nextStep);
+	document.getElementById('prev').addEventListener('click', prevStep);
+
+	document.addEventListener('keydown', function(e){
+		if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' '){ nextStep(); e.preventDefault(); }
+		else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || e.key === 'Backspace'){ prevStep(); e.preventDefault(); }
+		else if (e.key === 'Home'){ showFolio(0, false); }
+		else if (e.key === 'End'){ showFolio(total - 1, true); }
+	});
+
+	document.getElementById('deck').addEventListener('click', function(e){
+		if (e.target.closest('a,button,#toolbelt')) return;
+		var x = e.clientX / window.innerWidth;
+		if (x < 0.35) prevStep(); else nextStep();
+	});
+
+	var touchX = null;
+	document.addEventListener('touchstart', function(e){ touchX = e.changedTouches[0].clientX; }, {passive:true});
+	document.addEventListener('touchend', function(e){
+		if (touchX === null) return;
+		var dx = e.changedTouches[0].clientX - touchX;
+		if (Math.abs(dx) > 50){ dx < 0 ? nextStep() : prevStep(); }
+		touchX = null;
+	}, {passive:true});
+
+	<% if login %>
+	var recorder, recordingChunks = [];
+	var recStart = document.getElementById('rec-start');
+	var recStop = document.getElementById('rec-stop');
+	recStart.addEventListener('click', function(){
+		navigator.mediaDevices.getUserMedia({audio: true}).then(function(stream){
+			recorder = new MediaRecorder(stream);
+			recordingChunks = [];
+			recorder.ondataavailable = function(e){ if (e.data && e.data.size > 0) recordingChunks.push(e.data); };
+			recorder.start(1000);
+			recordingStartedAt = new Date();
+			presentation_timeline = [];
+			recStart.hidden = true;
+			recStop.hidden = false;
+		}).catch(function(err){ console.error('kolleg: microphone unavailable', err); });
+	});
+	recStop.addEventListener('click', function(){
+		recorder.stop();
+		var blob = new Blob(recordingChunks, {type: 'audio/webm'});
+		var fd = new FormData();
+		fd.append('audio_data', blob);
+		fd.append('knot_name', "<% knot.knot_name %>");
+		fd.append('presentation_id', <% knot.knot_id %>);
+		fd.append('duration', (new Date() - recordingStartedAt) / 1000);
+		fd.append('presentation_timeline', JSON.stringify(presentation_timeline));
+		fetch('/new_audio_knot', {method: 'POST', body: fd});
+		recStop.hidden = true;
+		recStart.hidden = false;
+		recordingStartedAt = null;
+	});
+	<% end %>
+
+	<% if knot.presentation_timeline and knot.ogg_url %>
+	var timeline = <% knot.presentation_timeline %>;
+	var audioFile = "<% knot.ogg_url %>";
+	var audio, currentEventIndex = 0, isPaused = false, sliderLock = false;
+	var playStart = document.getElementById('play-start');
+	var playPause = document.getElementById('play-pause');
+	var playSlider = document.getElementById('play-slider');
+
+	function handlePlaybackEvent(ev){
+		var targetIdx = ev.folioId ? folioIndexById[ev.folioId] : undefined;
+		if (typeof targetIdx === 'number' && targetIdx !== current){ showFolio(targetIdx, false); }
+		var p = ev.parameters || {};
+		if (typeof p.f === 'number' && typeof targetIdx === 'number'){
+			var upto = ev.eventType === 'fragmenthidden' ? p.f : p.f + 1;
+			fragmentsOf(folios[targetIdx]).forEach(function(fr, idx){ fr.classList.toggle('shown', idx < upto); });
+		}
+	}
+
+	playStart.addEventListener('click', function(){
+		if (!audio){
+			audio = new Audio(audioFile);
+			audio.addEventListener('loadedmetadata', function(){
+				playSlider.max = Math.floor(audio.duration);
+				playSlider.disabled = false;
+			});
+			audio.play();
+			isPaused = false;
+			playStart.hidden = true;
+			playPause.hidden = false;
+			audio.ontimeupdate = function(){
+				if (!sliderLock) playSlider.value = Math.floor(audio.currentTime);
+				if (!isPaused){
+					while (currentEventIndex < timeline.length && audio.currentTime >= timeline[currentEventIndex].timeElapsed){
+						handlePlaybackEvent(timeline[currentEventIndex]);
+						currentEventIndex++;
+					}
+				}
+			};
+			audio.onended = function(){ playStart.hidden = false; playPause.hidden = true; currentEventIndex = 0; };
+		} else if (isPaused){
+			audio.play();
+			isPaused = false;
+			playStart.hidden = true;
+			playPause.hidden = false;
+		}
+	});
+	playPause.addEventListener('click', function(){
+		if (audio && !isPaused){
+			audio.pause();
+			isPaused = true;
+			playStart.hidden = false;
+			playPause.hidden = true;
+		}
+	});
+	playSlider.addEventListener('input', function(e){
+		var t = parseFloat(e.target.value);
+		if (!audio) return;
+		sliderLock = true;
+		audio.currentTime = t;
+		currentEventIndex = timeline.findIndex(function(ev){ return ev.timeElapsed > t; });
+		if (currentEventIndex < 0) currentEventIndex = timeline.length;
+		if (currentEventIndex > 0) currentEventIndex--;
+		if (timeline[currentEventIndex]) handlePlaybackEvent(timeline[currentEventIndex]);
+		sliderLock = false;
+	});
+	<% end %>
+
+	var hashVal = parseInt((location.hash || '').replace('#',''), 10);
+	var hasHash = !isNaN(hashVal) && hashVal >= 1;
+	showFolio(hasHash ? hashVal - 1 : 0, hasHash);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!-- shared SEO <head> block: description, canonical, Open Graph, Twitter card,
+     robots. Included by every kolleg/semester + domain-canonical template.
+     Relies on vars already in scope from the /view/ route: knot, a, request.
+     Pass skip_basic=1 when the caller already included modules/brahma.tt --
+     it emits its own (legacy, "++"-path-based) description and canonical,
+     and two canonical links on one page is a genuine SEO problem, not a
+     cosmetic one, so we don't double up -- only the Open Graph/Twitter/
+     robots tags below are new value on top of what brahma.tt gives. -->
+<% gn_description = (knot.knot_content ? knot.knot_content.remove_html_tags : knot.knot_name.short_name) | truncate(160) %>
+<% gn_url = "https://" _ request.host _ request.path %>
+<% UNLESS skip_basic %>
+<meta name="description" content="<% gn_description %>">
+<link rel="canonical" href="<% gn_url %>">
+<% END %>
+<meta property="og:site_name" content="<% request.host %>">
+<meta property="og:title" content="<% knot.knot_name.short_name %>">
+<meta property="og:description" content="<% gn_description %>">
+<meta property="og:type" content="article">
+<meta property="og:url" content="<% gn_url %>">
+<% if knot.img_url %><meta property="og:image" content="https://<% request.host %><% knot.img_url %>"><% end %>
+<meta name="twitter:card" content="<% if knot.img_url %>summary_large_image<% else %>summary<% end %>">
+<meta name="twitter:title" content="<% knot.knot_name.short_name %>">
+<meta name="twitter:description" content="<% gn_description %>">
+<meta name="robots" content="<% if a.public %>index,follow<% else %>noindex,nofollow<% end %>">

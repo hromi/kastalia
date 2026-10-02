@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><% knot.knot_name %></title>
+<% INCLUDE modules/graph_seo_head.tt %>
+<style>
+*{box-sizing:border-box;}
+body{
+	font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+	max-width:38em;margin:0 auto;padding:1em;
+	color:#111;background:#fdfdfb;line-height:1.5;
+}
+h1{font-size:1.4em;border-bottom:3px solid #111;padding-bottom:.2em;}
+.abstract{margin:.6em 0 1.2em;}
+.item{border-bottom:1px solid #ccc;padding:.5em 0;}
+.item a{color:#111;text-decoration:none;font-weight:600;}
+.item a:visited{color:#444;}
+.d1{margin-left:0;}
+.d2{margin-left:1.4em;}
+.d3{margin-left:2.8em;font-size:.95em;}
+.d4{margin-left:4.2em;font-size:.9em;}
+.excerpt{display:block;font-weight:normal;color:#444;font-size:.92em;}
+.meta{font-size:.78em;color:#777;margin-top:2em;border-top:1px solid #ccc;padding-top:.6em;}
+.empty{color:#777;font-style:italic;}
+@media (max-width:420px){.d2{margin-left:.9em;}.d3{margin-left:1.6em;}.d4{margin-left:2.3em;}}
+.gn-breadcrumb{position:static;max-width:none;white-space:normal;opacity:1;color:#555;font-size:.85em;display:block;margin-bottom:.4em;}
+.gn-breadcrumb a{color:#111;}
+.gn-altpaths{position:static;max-width:none;color:#777;font-size:.78em;}
+</style>
+</head>
+<body>
+<% INCLUDE modules/graph_breadcrumb.tt %>
+<h1><% knot.knot_name.short_name %></h1>
+<% if knot.knot_content %><p class="abstract"><% knot.knot_content %></p><% end %>
+
+<% deck = knot.knot_id.get_full_deck(4) %>
+<% FOREACH d IN deck %>
+	<div class="item d<% d.depth %>">
+		<a href="/<% d.knot_id %>.html"><% d.knot_name.short_name %></a>
+		<% if d.knot_content %><span class="excerpt"><% d.knot_content.remove_html_tags | truncate(140) %></span><% end %>
+	</div>
+<% END %>
+<% IF !deck.size %><p class="empty">(nothing here yet)</p><% END %>
+
+<p class="meta">offgrid view &middot; plain text, no scripts, no webfonts &middot; safe to print or read on a slow connection</p>
+</body>
+</html>

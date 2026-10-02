@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><% knot.knot_name %> :: treehouse</title>
+<% INCLUDE modules/graph_seo_head.tt %>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{ --bark:#4a3324; --leaf:#4f7942; --leaf-dark:#2f4a28; --parchment:#f3ecd9; --ink:#3a2e1f; }
+*{box-sizing:border-box;}
+html,body{margin:0;}
+body{
+	background:
+		radial-gradient(ellipse at top, #d7e8c9 0%, var(--parchment) 55%);
+	color:var(--ink);
+	font-family:'Source Serif 4', Georgia, serif;
+	padding:0 1rem 5rem;
+}
+h1.sign{
+	font-family:'Caveat', cursive;
+	font-size:clamp(2.2rem,6vw,3.4rem);
+	text-align:center;
+	color:var(--bark);
+	padding-top:1.6rem;
+	margin:0;
+	transform:rotate(-1.2deg);
+}
+.plank{
+	max-width:780px;margin:0 auto 2rem;
+	background:var(--parchment);
+	border:1px solid #cdbf98;
+	border-radius:4px;
+	box-shadow:0 10px 24px rgba(74,51,36,.12);
+	padding:1.4rem 1.6rem;
+}
+.abstract{font-style:italic;color:#5a4a33;margin:0;}
+
+.grove{max-width:780px;margin:0 auto;}
+details{
+	border-left:3px solid var(--leaf);
+	margin:.15rem 0 .15rem .4rem;
+	padding-left:1rem;
+}
+details[open] > summary{color:var(--leaf-dark);}
+details.depth-0{border-left:none;margin-left:0;padding-left:0;}
+summary{
+	cursor:pointer;
+	list-style:none;
+	padding:.25rem 0;
+	font-weight:600;
+	color:var(--bark);
+}
+summary::-webkit-details-marker{display:none;}
+summary::before{content:"\1F343  ";}
+details.leaf summary::before{content:"\1F342  ";}
+summary a{color:inherit;text-decoration:none;}
+summary a:hover{text-decoration:underline;}
+.snippet{display:block;margin:.15rem 0 .3rem 1.6rem;font-size:.88rem;color:#5a4a33;font-style:italic;font-weight:normal;}
+.rhizome{margin:0 0 .4rem 1.6rem;font-size:.78rem;color:var(--leaf-dark);}
+.rhizome a{color:inherit;}
+.more{margin-left:1.6rem;font-size:.85rem;}
+.more a{color:#8a6d2f;}
+.gn-breadcrumb,.gn-altpaths{position:static;max-width:640px;margin:0 auto;white-space:normal;opacity:.8;color:var(--bark);font-size:.82rem;display:block;text-align:center;}
+.gn-breadcrumb a{color:var(--leaf-dark);}
+.gn-breadcrumb .gn-current{color:var(--bark);font-weight:600;}
+</style>
+</head>
+<body>
+<% INCLUDE modules/graph_breadcrumb.tt %>
+<h1 class="sign"><% knot.knot_name.short_name %></h1>
+<% if knot.knot_content %><div class="plank"><p class="abstract"><% knot.knot_content %></p></div><% end %>
+
+<% lab = knot.knot_id.get_labyrinth(5) %>
+<div class="grove">
+<% BLOCK branch %>
+	<details class="depth-<% node.depth %><% unless node.children.size %> leaf<% end %>"<% if node.depth < 2 %> open<% end %>>
+		<summary><a href="/<% node.id %>.html"><% node.name %></a></summary>
+		<% if node.snippet %><span class="snippet"><% node.snippet %></span><% end %>
+		<% links = lab.rhizome_by_node.item(node.id) %>
+		<% if links.size %>
+		<div class="rhizome">
+			<% FOREACH l IN links %><% if l.dir == 'out' %>&rarr;<% else %>&larr;<% end %> <% l.predicate %> <a href="/<% l.other_id %>.html"><% l.other_name %></a><% unless loop.last %> &middot; <% end %><% END %>
+		</div>
+		<% end %>
+		<% FOREACH child IN node.children %>
+			<% INCLUDE branch node=child %>
+		<% END %>
+		<% if node.has_more %><div class="more"><a href="/<% node.id %>.html">&hellip; the branch continues</a></div><% end %>
+	</details>
+<% END %>
+<% INCLUDE branch node=lab.root %>
+</div>
+</body>
+</html>

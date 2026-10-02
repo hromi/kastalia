@@ -1,0 +1,19 @@
+<!-- shared "other predicates" widget: is_parent/contains already ARE the main
+     navigation everywhere, so this surfaces everything else (illustrates,
+     translates, is_uttered_as, is_linked, is_member, has_property, has_answer,
+     ...) -- the non-hierarchical edges a pure tree view hides. `objects` (this
+     knot as subject) and `subjects` (this knot as object) are already passed
+     in by the /view/ route. Unstyled -- each template styles .gn-related /
+     .gn-related-h / .gn-rel-dir to match its own look. -->
+<% gn_skip = {is_parent=>1, contains=>1, created_by=>1, has_session=>1, has_bookmark=>1} %>
+<% gn_rel = [] %>
+<% FOREACH gn_o IN objects %><% UNLESS gn_skip.item(gn_o.predicate) %><% gn_rel.push({dir=>'out', predicate=>gn_o.predicate, id=>gn_o.object_id, name=>gn_o.object_name.short_name}) %><% END %><% END %>
+<% FOREACH gn_s IN subjects %><% UNLESS gn_skip.item(gn_s.predicate) %><% gn_rel.push({dir=>'in', predicate=>gn_s.predicate, id=>gn_s.subject_id, name=>gn_s.subject_name.short_name}) %><% END %><% END %>
+<% if gn_rel.size %>
+<section class="gn-related">
+	<h2 class="gn-related-h"><% gn_related_title or "Also connected" %></h2>
+	<ul>
+	<% FOREACH gn_r IN gn_rel %><li><span class="gn-rel-dir"><% if gn_r.dir == 'out' %>&rarr;<% else %>&larr;<% end %></span> <em><% gn_r.predicate %></em> <a href="/<% gn_r.id %>.html"><% gn_r.name %></a></li><% END %>
+	</ul>
+</section>
+<% end %>

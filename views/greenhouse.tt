@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><% knot.knot_name %> :: greenhouse</title>
+<% INCLUDE modules/graph_seo_head.tt %>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;}
+html,body{margin:0;}
+body{
+	font-family:'Quicksand',system-ui,sans-serif;
+	background:linear-gradient(180deg,#cfeaf5 0%,#eaf6e8 42%,#d8ecd3 100%);
+	min-height:100vh;color:#2f3a28;
+}
+header{text-align:center;padding:2.4rem 1rem 1rem;}
+header h1{margin:0;font-weight:700;font-size:clamp(1.6rem,5vw,2.4rem);color:#3b6b3b;}
+header .abstract{max-width:50ch;margin:.7rem auto 0;color:#50603f;font-size:.98rem;}
+
+.bed{
+	display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));
+	gap:1.4rem;max-width:1100px;margin:1.5rem auto 0;padding:0 1.4rem 3rem;
+}
+.plant{text-align:center;position:relative;}
+.pot{
+	height:150px;display:flex;align-items:flex-end;justify-content:center;
+	transition:transform .25s ease;
+}
+.plant:hover .pot{transform:translateY(-6px) scale(1.06);}
+.stem{width:6px;border-radius:3px;margin:0 auto;}
+.bloom{border-radius:50% 50% 46% 46% / 60% 60% 40% 40%;margin:0 auto -4px;position:relative;}
+.bloom::before,.bloom::after{
+	content:"";position:absolute;top:18%;width:38%;height:64%;border-radius:50%;
+	background:inherit;opacity:.85;
+}
+.bloom::before{left:-16%;transform:rotate(-18deg);}
+.bloom::after{right:-16%;transform:rotate(18deg);}
+.soil{width:46px;height:9px;background:#6b4c33;border-radius:50%;margin:0 auto;opacity:.5;}
+.label{margin-top:.6rem;}
+.label a{color:#2f3a28;text-decoration:none;font-weight:700;font-size:.86rem;}
+.label a:hover{color:#3b6b3b;text-decoration:underline;}
+.empty{text-align:center;color:#5c6b4f;font-style:italic;padding:3rem 0;}
+.gn-breadcrumb{position:static;max-width:none;white-space:normal;opacity:.85;color:#50603f;font-size:.8rem;display:block;margin-top:.5rem;}
+.gn-breadcrumb a{color:#3b6b3b;}
+.gn-breadcrumb .gn-current{color:#2f3a28;font-weight:700;}
+.gn-altpaths{position:static;max-width:none;color:#5c6b4f;font-size:.7rem;}
+.gn-related{max-width:1100px;margin:0 auto 3rem;padding:1.2rem 1.4rem 0;border-top:1px dashed #9fc79a;}
+.gn-related-h{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:#5c6b4f;}
+.gn-related ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:.6rem;}
+.gn-related li{font-size:.84rem;color:#50603f;background:#eaf6e8;border:1px solid #9fc79a;border-radius:999px;padding:.3rem .8rem;}
+.gn-related em{font-style:normal;color:#3b6b3b;}
+.gn-related a{color:#2f3a28;font-weight:700;}
+</style>
+</head>
+<body>
+<header>
+	<h1><% knot.knot_name.short_name %></h1>
+	<% if knot.knot_content %><p class="abstract"><% knot.knot_content.remove_html_tags %></p><% end %>
+	<% INCLUDE modules/graph_breadcrumb.tt %>
+</header>
+
+<div class="bed">
+<% children = knot.knot_id.get_children %>
+<% FOREACH c IN children %>
+	<% hue = (c.knot_id * 47) % 360 %>
+	<% h = 44 + (c.knot_id % 6) * 13 %>
+	<% bloom_sz = 26 + (c.knot_id % 4) * 6 %>
+	<div class="plant">
+		<div class="pot">
+			<div>
+				<div class="bloom" style="width:<% bloom_sz %>px;height:<% bloom_sz %>px;background:hsl(<% hue %>,68%,62%);"></div>
+				<div class="stem" style="height:<% h %>px;background:linear-gradient(180deg,#7bab5e,#4f7942);"></div>
+				<div class="soil"></div>
+			</div>
+		</div>
+		<div class="label"><a href="/<% c.knot_id %>.html"><% c.knot_name.short_name %></a></div>
+	</div>
+<% END %>
+<% IF !children.size %><div class="empty">nothing has been planted here yet</div><% END %>
+</div>
+<% INCLUDE modules/graph_related.tt gn_related_title="Cross-pollinated with" %>
+</body>
+</html>

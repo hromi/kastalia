@@ -1,0 +1,18 @@
+<!-- shared breadcrumb: full ancestor chain (not just one parent level) so any
+     template can surface "higher regions of the labyrinth" in one click, plus
+     a BreadcrumbList JSON-LD block for search engines. Unstyled on purpose --
+     each template supplies its own CSS for .gn-breadcrumb / .gn-sep / .gn-current
+     / .gn-altpaths to match its own look. -->
+<% gn_chains = knot.knot_id.get_ancestor_chain(10) %>
+<% gn_primary = gn_chains.first %>
+<% if gn_chains.size %>
+<nav class="gn-breadcrumb" aria-label="breadcrumb">
+	<% FOREACH gn_a IN gn_primary %><a href="/<% gn_a.id %>.html"><% gn_a.name %></a><span class="gn-sep">/</span><% END %><span class="gn-current" aria-current="page"><% knot.knot_name.short_name %></span>
+</nav>
+<% if gn_chains.size > 1 %><p class="gn-altpaths">also reachable via <% gn_chains.size - 1 %> other path<% if gn_chains.size != 2 %>s<% end %> through the graph</p><% end %>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[
+<% FOREACH gn_a IN gn_primary %>{"@type":"ListItem","position":<% loop.count %>,"name":"<% gn_a.name.replace('"','\\"') %>","item":"https://<% request.host %>/<% gn_a.id %>.html"}<% unless loop.last %>,<% end %><% END %>
+]}
+</script>
+<% end %>

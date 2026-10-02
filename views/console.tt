@@ -1,0 +1,87 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><% knot.knot_name %> :: console</title>
+<% INCLUDE modules/graph_seo_head.tt %>
+<style>
+:root{ --bg:#030a03; --fg:#3df53d; --dim:#1e7a1e; --amber:#e8b339; }
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--bg);color:var(--fg);}
+body{
+	font-family:'Courier New',ui-monospace,monospace;
+	font-size:15px;line-height:1.45;
+	padding:1.2rem 1.4rem 3rem;
+	max-width:900px;margin-inline:auto;
+	text-shadow:0 0 2px rgba(61,245,61,.55);
+}
+body::before{
+	content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
+	background:repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0, rgba(0,0,0,0) 2px, rgba(0,0,0,.18) 3px);
+	mix-blend-mode:multiply;
+}
+a{color:var(--amber);text-decoration:none;}
+a:hover{text-decoration:underline;}
+.prompt{color:var(--dim);}
+.prompt .user{color:var(--fg);}
+.prompt .path{color:var(--amber);}
+h1{font-size:1em;font-weight:normal;margin:1.4em 0 .4em;color:var(--amber);}
+h1::before{content:"## ";color:var(--dim);}
+.content{white-space:normal;color:var(--fg);opacity:.92;margin:.3em 0 1em;}
+table{border-collapse:collapse;width:100%;font-size:.95em;}
+td{padding:.15em .6em .15em 0;vertical-align:top;}
+td.id{color:var(--dim);}
+td.id::before{content:"[";}
+td.id::after{content:"]";}
+.log-line{white-space:pre-wrap;word-break:break-all;}
+.log-ts{color:var(--dim);}
+.cursor{display:inline-block;width:.6em;height:1em;background:var(--fg);vertical-align:text-bottom;animation:blink 1s steps(1) infinite;}
+@keyframes blink{50%{opacity:0;}}
+.footer{margin-top:2em;color:var(--dim);font-size:.85em;}
+.gn-breadcrumb,.gn-altpaths{position:static;max-width:none;white-space:normal;opacity:1;color:var(--dim);font-size:1em;display:block;margin:0 0 .3em;}
+.gn-breadcrumb a{color:var(--amber);}
+.gn-breadcrumb .gn-sep{margin:0 .15em;}
+.gn-breadcrumb .gn-current{color:var(--fg);}
+.gn-related{margin-top:0;}
+.gn-related-h{font-size:1em;font-weight:normal;color:var(--amber);margin:1.4em 0 .4em;}
+.gn-related-h::before{content:"## ";color:var(--dim);}
+.gn-related ul{list-style:none;margin:0;padding:0;}
+.gn-related li{padding:.1em 0;}
+.gn-related em{font-style:normal;color:var(--dim);}
+.gn-related a{color:var(--amber);}
+</style>
+</head>
+<body>
+<div class="prompt"><span class="user">visitor@<% request.host %></span>:<span class="path">~</span>$ pwd</div>
+<% INCLUDE modules/graph_breadcrumb.tt %>
+
+<div class="prompt"><span class="user">visitor@<% request.host %></span>:<span class="path">~</span>$ cat "<% knot.knot_name %>"</div>
+
+<% if knot.knot_content %><div class="content"><% knot.knot_content %></div><% end %>
+
+<h1>ls -la ./</h1>
+<table>
+<% children = knot.knot_id.get_children %>
+<% FOREACH c IN children %>
+<tr>
+	<td class="id">#<% c.knot_id %></td>
+	<td><a href="/<% c.knot_id %>.html">./<% c.knot_name.short_name %></a></td>
+	<% IF c.date %><td class="log-ts"><% c.date %></td><% END %>
+</tr>
+<% END %>
+<% IF !children.size %><tr><td class="log-ts">(empty directory)</td></tr><% END %>
+</table>
+
+<h1>tail -f zeitgeist.log</h1>
+<% zg = zeitgeist %>
+<% FOREACH z IN zg.slice(0,19) %>
+<div class="log-line"><span class="log-ts">[<% z.action_executed %>]</span> <% z.method %> <% z.action %><% if z.agent %> &middot; <% z.agent.short_name %><% end %></div>
+<% END %>
+<% IF !zg.size %><div class="log-line log-ts">(no recorded activity)</div><% END %>
+
+<% INCLUDE modules/graph_related.tt gn_related_title="grep -r --other-predicates ." %>
+
+<div class="footer prompt"><span class="user">visitor@<% request.host %></span>:<span class="path">~</span>$ <span class="cursor"></span></div>
+</body>
+</html>

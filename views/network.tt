@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><% knot.knot_name %> :: network</title>
+<% INCLUDE modules/graph_seo_head.tt %>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root{ --bg:#0d0f14; --ink:#dfe4ee; --dim:#5b6475; --accent:#ff6b5e; }
+*{box-sizing:border-box;}
+html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;}
+body{color:var(--ink);font-family:ui-monospace,'Courier New',monospace;}
+#hud{position:fixed;top:1rem;left:1rem;max-width:46ch;z-index:5;}
+#hud h1{font-size:1rem;margin:0;font-weight:600;}
+#hud .abstract{color:var(--dim);font-size:.82rem;margin:.3rem 0 0;}
+#hud .hint{color:var(--dim);font-size:.72rem;margin-top:.5rem;}
+svg{display:block;width:100vw;height:100vh;}
+.edge{stroke:#2a3040;stroke-width:1.2px;}
+.node circle{stroke:var(--bg);stroke-width:2px;cursor:pointer;}
+.node text{fill:var(--ink);font-size:11px;pointer-events:none;}
+.node:hover circle{stroke:var(--accent);}
+.node:hover text{fill:var(--accent);}
+#empty{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-style:italic;}
+.gn-breadcrumb{position:static;max-width:none;white-space:normal;opacity:.85;color:var(--dim);font-size:.72rem;display:block;margin-top:.4rem;}
+.gn-breadcrumb a{color:var(--dim);}
+.gn-breadcrumb a:hover{color:var(--accent);}
+.gn-breadcrumb .gn-current{color:var(--ink);}
+.gn-altpaths{position:static;max-width:none;color:var(--dim);font-size:.66rem;}
+</style>
+</head>
+<body>
+<div id="hud">
+	<h1><% knot.knot_name.short_name %></h1>
+	<% if knot.knot_content %><p class="abstract"><% knot.knot_content.remove_html_tags | truncate(180) %></p><% end %>
+	<% INCLUDE modules/graph_breadcrumb.tt %>
+	<p class="hint">drag nodes &middot; click a node to open it</p>
+</div>
+<svg id="graph"></svg>
+
+<script>
+var graph = <% knot.knot_id.get_graph_json(3) %>;
+if (!graph.nodes.length) {
+	document.getElementById('graph').replaceWith(Object.assign(document.createElement('div'), {id:'empty', textContent:'no network around this knot yet'}));
+} else {
+	var svg = d3.select('#graph');
+	var width = window.innerWidth, height = window.innerHeight;
+	var color = d3.scaleOrdinal().domain([0,1,2,3,4,5]).range(['#ff6b5e','#5ec8e0','#9b8cff','#6fcf97','#f2c14e','#dfe4ee']);
+	var radius = d3.scaleLinear().domain([0, d3.max(graph.nodes, function(n){return n.depth;}) || 1]).range([16,6]);
+
+	var sim = d3.forceSimulation(graph.nodes)
+		.force('link', d3.forceLink(graph.edges).id(function(d){return d.id;}).distance(90).strength(.6))
+		.force('charge', d3.forceManyBody().strength(-220))
+		.force('center', d3.forceCenter(width/2, height/2))
+		.force('collide', d3.forceCollide().radius(28));
+
+	var edge = svg.append('g').selectAll('line').data(graph.edges).enter().append('line').attr('class','edge');
+
+	var node = svg.append('g').selectAll('g').data(graph.nodes).enter().append('g')
+		.attr('class','node')
+		.call(d3.drag()
+			.on('start', function(event,d){ if(!event.active) sim.alphaTarget(.3).restart(); d.fx=d.x; d.fy=d.y; })
+			.on('drag', function(event,d){ d.fx=event.x; d.fy=event.y; })
+			.on('end', function(event,d){ if(!event.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+
+	node.append('circle').attr('r', function(d){return radius(d.depth);}).attr('fill', function(d){return color(d.depth);});
+	node.append('text').attr('dx', function(d){return radius(d.depth)+4;}).attr('dy', '.32em').text(function(d){return d.name;});
+	node.on('click', function(event,d){ window.location = '/'+d.id+'.html'; });
+
+	sim.on('tick', function(){
+		edge
+			.attr('x1', function(d){return d.source.x;}).attr('y1', function(d){return d.source.y;})
+			.attr('x2', function(d){return d.target.x;}).attr('y2', function(d){return d.target.y;});
+		node.attr('transform', function(d){return 'translate('+d.x+','+d.y+')';});
+	});
+
+	window.addEventListener('resize', function(){
+		width = window.innerWidth; height = window.innerHeight;
+		sim.force('center', d3.forceCenter(width/2, height/2));
+		sim.alpha(.3).restart();
+	});
+}
+</script>
+</body>
+</html>
