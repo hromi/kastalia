@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1024">
+<title><% knot.knot_name %> :: fractal</title>
+<% INCLUDE modules/graph_seo_head.tt %>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{ --accent:#EC1C24; --ink:#222; --dim:#777; }
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;}
+body{
+	font-family:'Jost',Avenir,sans-serif;color:var(--ink);
+	background:rgb(215,215,215);
+	background:radial-gradient(rgb(240,240,240),rgb(190,190,190));
+}
+.fallback-message{display:none;padding:2rem;max-width:40em;margin:3rem auto;font-size:1.1rem;}
+body.impress-not-supported .fallback-message{display:block;}
+body.impress-not-supported #impress,
+body.impress-not-supported #hud{display:none;}
+
+#impress .step{
+	width:880px;padding:2.4rem 3rem;
+	opacity:.08;transition:opacity 1s ease;
+}
+#impress .step.active{opacity:1;}
+#impress .step.leaf{border-top:14px var(--accent) solid;}
+#impress .step.section{text-align:center;}
+#impress .step.section h1{font-size:2.6rem;}
+#impress .step.section::after{content:"";display:block;width:4rem;height:6px;background:var(--accent);margin:1rem auto 0;}
+#impress .step.root{text-align:center;}
+#impress .step.root h1{font-size:3.4rem;}
+#impress .step.root .accentbar{width:5rem;height:8px;background:var(--accent);margin:1.2rem auto 0;}
+
+.step h1{font-size:1.9rem;font-weight:700;margin:0 0 1rem;line-height:1.15;}
+.step .body{font-size:1.15rem;line-height:1.5;}
+.step .body img{
+	/* Original inline styles set a fixed height (e.g. "height:61vh") expecting
+	   width:auto to follow freely -- but forcing width:auto!important + height:
+	   auto!important here, bounded by max-width/max-height together, is what
+	   actually keeps the aspect ratio: capping only max-width while an inline
+	   height stays fixed is exactly what stretched images sideways. */
+	width:auto !important;height:auto !important;
+	max-width:42%;max-height:55vh;object-fit:contain;
+	float:left;margin:0 2rem 1rem 0;
+}
+.step .body p{margin:0 0 .8rem;}
+.step .abstract{color:var(--dim);font-style:italic;font-size:1.1rem;max-width:36em;margin:1rem auto 0;}
+
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;padding:.8rem 1.1rem;font-size:.78rem;color:var(--dim);
+	display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;}
+#hud a, #hud .gn-breadcrumb a{pointer-events:auto;}
+.gn-breadcrumb{position:static;max-width:60vw;white-space:normal;opacity:.85;color:var(--dim);font-size:.76rem;}
+.gn-breadcrumb a{color:#555;}
+.gn-breadcrumb a:hover{color:var(--accent);}
+.gn-breadcrumb .gn-current{color:var(--ink);}
+.gn-altpaths{position:static;max-width:none;color:var(--dim);font-size:.66rem;}
+#counter{white-space:nowrap;}
+
+#hint{position:fixed;bottom:.8rem;left:0;right:0;text-align:center;font-size:.75rem;color:var(--dim);z-index:50;}
+</style>
+</head>
+<body class="impress-not-supported">
+
+<div class="fallback-message">
+	<p>Your browser doesn't support the 3D/CSS transforms this fractal view needs.</p>
+	<p>Try a recent Chrome, Firefox or Safari -- or visit <a href="/<% knot.knot_id %>.semester">the plain overview</a> instead.</p>
+</div>
+
+<div id="hud">
+	<% INCLUDE modules/graph_breadcrumb.tt %>
+	<span id="counter"></span>
+</div>
+<div id="hint">scroll, swipe, arrow keys or click to zoom through the fractal &middot; space/esc to overview</div>
+
+<div id="impress" data-transition-duration="900">
+	<div id="step-root" class="step root" data-x="0" data-y="0" data-z="0" data-scale="9">
+		<h1><% knot.knot_name.short_name %></h1>
+		<div class="accentbar"></div>
+		<% if knot.knot_content %><p class="abstract"><% knot.knot_content.remove_html_tags %></p><% end %>
+	</div>
+	<% deck = knot.knot_id.get_full_deck(8) %>
+	<% FOREACH d IN deck %>
+		<div id="step-<% d.knot_id %>" class="step <% if d.depth == 1 %>section<% else %>leaf<% end %>" data-depth="<% d.depth %>">
+			<h1><% d.knot_name.short_name %></h1>
+			<% if d.knot_content %><div class="body"><% d.knot_content %></div><% end %>
+		</div>
+	<% END %>
+</div>
+
+<script src="/js/impress.js"></script>
+<script>
+var nodes = Array.prototype.slice.call(document.querySelectorAll('#impress .step'));
+var total = nodes.length;
+
+// Reconstruct parent/children from depth alone: nodes are already in
+// document order (which is depth-first, matching the knot tree's own
+// ord), so each node's parent is simply whichever record was last seen
+// one depth shallower -- the standard outline-reconstruction trick.
+var byDepth = {};
+var records = [];
+nodes.forEach(function (el) {
+	var depth = el.id === 'step-root' ? 0 : parseInt(el.dataset.depth, 10);
+	var rec = { el: el, children: [] };
+	if (depth > 0 && byDepth[depth - 1]) byDepth[depth - 1].children.push(rec);
+	byDepth[depth] = rec;
+	records.push(rec);
+});
+var root = records[0];
+
+// Fractal layout: every node's children spiral out around it -- NOT a
+// closed ring (equal radius for every child looks like a plain circle),
+// but a logarithmic/exponential spiral: radius grows GEOMETRICALLY from
+// child to child (small step for the first couple, a big leap by the
+// last one -- the actual visual signature of exponential growth), at a
+// constant golden-angle turn per step so they fan out without overlapping
+// (the same phyllotaxis pattern sunflower seeds use). Scale still shrinks
+// a quarter each level, lifted from the original hand-authored decks.
+var SCALE = [9, 4, 1, 0.45, 0.2];
+var RADIUS_MIN = [0, 900, 380, 170, 85];
+var RADIUS_MAX = [0, 3400, 1500, 650, 320];
+var GOLDEN_ANGLE = 2.39996323; // ~137.5 degrees, in radians
+
+function place(rec, depth, cx, cy) {
+	rec.el.setAttribute('data-x', Math.round(cx));
+	rec.el.setAttribute('data-y', Math.round(cy));
+	rec.el.setAttribute('data-z', 0);
+	rec.el.setAttribute('data-scale', SCALE[Math.min(depth, SCALE.length - 1)]);
+	var n = rec.children.length;
+	if (!n) return;
+	var rMin = RADIUS_MIN[Math.min(depth + 1, RADIUS_MIN.length - 1)];
+	var rMax = RADIUS_MAX[Math.min(depth + 1, RADIUS_MAX.length - 1)];
+	rec.children.forEach(function (child, i) {
+		var angle = i * GOLDEN_ANGLE;
+		var r = n > 1 ? rMin * Math.pow(rMax / rMin, i / (n - 1)) : (rMin + rMax) / 2;
+		place(child, depth + 1, cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+	});
+}
+place(root, 0, 0, 0);
+
+impress().init();
+
+var counter = document.getElementById('counter');
+function updateCounter() {
+	var active = document.querySelector('#impress .step.active');
+	var idx = active ? nodes.indexOf(active) + 1 : 1;
+	counter.textContent = idx + ' / ' + total;
+}
+document.getElementById('impress').addEventListener('impress:stepenter', updateCounter);
+updateCounter();
+
+nodes.forEach(function (el) {
+	el.addEventListener('dblclick', function () {
+		window.location = '/' + el.id.replace('step-', '') + '.html';
+	});
+});
+</script>
+</body>
+</html>

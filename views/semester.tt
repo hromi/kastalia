@@ -3,18 +3,61 @@
 <% INCLUDE modules/graph_seo_head.tt skip_basic=1 %>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/kolleg.css">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&family=Orbitron:wght@500;700;800&family=JetBrains+Mono:wght@400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/mainframe.css">
 <style>
-:root{
-	--bg: <%if knot.kolleg_bg%><%knot.kolleg_bg%><%else%>#070706<%end%>;
-	--ink: <%if knot.kolleg_ink%><%knot.kolleg_ink%><%else%>#ece3cf<%end%>;
-	--dim: <%if knot.kolleg_dim%><%knot.kolleg_dim%><%else%>#8c8371<%end%>;
-	--accent: <%if knot.kolleg_accent%><%knot.kolleg_accent%><%else%>#c6a15b<%end%>;
-	--display: 'Cinzel', <%if knot.font%>'<%knot.font%>',<%end%> Georgia, serif;
-	--body: <%if knot.font%>'<%knot.font%>',<%end%> 'Cormorant Garamond', Georgia, serif;
+@font-face { font-family:"Cyberpunk"; src:url(/Cyberpunk.otf); font-display:swap; }
+
+/* ----------------------------------------------------------------------
+   Same 5 skins as mainframe.tt, selected via body[data-skin="..."] and
+   persisted under the same localStorage key ("mainframe_skin") -- so
+   picking a skin on a deck or on its course overview here keeps both in
+   sync. Keep this block byte-for-byte in step with mainframe.tt's own.
+   ---------------------------------------------------------------------- */
+body{
+	--bg:#030504; --ink:#c9ffe6; --dim:#4f8a71; --accent:#00ff9c; --accent2:#ff2bd6;
+	--display:'Cyberpunk','JetBrains Mono',monospace; --bodyfont:'Share Tech Mono','JetBrains Mono',monospace;
+	--img-filter:grayscale(1) sepia(.45) hue-rotate(60deg) saturate(2.6) contrast(1.12) brightness(.82);
+	--radius:2px;
 }
-body{min-height:100dvh;}
+body[data-skin="classical"]{
+	--bg:#f4efe2; --ink:#201b12; --dim:#7d7259; --accent:#a9802f; --accent2:#6b4a9a;
+	--display:'Cinzel',Georgia,serif; --bodyfont:'Cormorant Garamond',Georgia,serif;
+	--img-filter:grayscale(1) sepia(.35) contrast(1.08) brightness(.97);
+	--radius:14px;
+}
+body[data-skin="modern"]{
+	--bg:#f6f7f8; --ink:#14181a; --dim:#5c6468; --accent:#1f6feb; --accent2:#e8604c;
+	--display:'Inter',system-ui,sans-serif; --bodyfont:'Inter',system-ui,sans-serif;
+	--img-filter:none;
+	--radius:10px;
+}
+body[data-skin="noir"]{
+	--bg:#111113; --ink:#e9e9ea; --dim:#6b6b70; --accent:#c9c9d1; --accent2:#8f8f98;
+	--display:'Playfair Display',Georgia,serif; --bodyfont:'Inter',system-ui,sans-serif;
+	--img-filter:grayscale(1) contrast(1.15) brightness(.92);
+	--radius:4px;
+}
+body[data-skin="synthwave"]{
+	--bg:#1a0b2e; --ink:#ffd9f3; --dim:#9a6fae; --accent:#ff2fb0; --accent2:#20d9fe;
+	--display:'Orbitron','JetBrains Mono',monospace; --bodyfont:'JetBrains Mono',monospace;
+	--img-filter:grayscale(1) sepia(.5) hue-rotate(260deg) saturate(3) contrast(1.1) brightness(.85);
+	--radius:2px;
+}
+body[data-skin="cyberpunk"]{
+	--bg:#030504; --ink:#c9ffe6; --dim:#4f8a71; --accent:#00ff9c; --accent2:#ff2bd6;
+	--display:'Cyberpunk','JetBrains Mono',monospace; --bodyfont:'Share Tech Mono','JetBrains Mono',monospace;
+	--img-filter:grayscale(1) sepia(.45) hue-rotate(60deg) saturate(2.6) contrast(1.12) brightness(.82);
+	--radius:2px;
+}
+/* per-knot fine-tuning still wins over whichever skin is active */
+<% if knot.mainframe_bg %>body{--bg:<% knot.mainframe_bg %> !important;}<% end %>
+<% if knot.mainframe_ink %>body{--ink:<% knot.mainframe_ink %> !important;}<% end %>
+<% if knot.mainframe_dim %>body{--dim:<% knot.mainframe_dim %> !important;}<% end %>
+<% if knot.mainframe_accent %>body{--accent:<% knot.mainframe_accent %> !important;}<% end %>
+
+*{box-sizing:border-box;}
+body{min-height:100dvh;background:var(--bg);color:var(--ink);font-family:var(--bodyfont);transition:background-color .3s ease,color .3s ease;}
 
 header{
 	max-width:72rem;margin:0 auto;
@@ -24,9 +67,13 @@ header{
 .breadcrumb{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:1rem;}
 .breadcrumb a{color:var(--dim);}
 .breadcrumb a:hover{color:var(--accent);}
-header h1{font-size:clamp(2rem,5vw,3.6rem);line-height:1.15;}
-header .rule{margin:1.1rem auto 0;}
+header h1{font-family:var(--display);font-size:clamp(2rem,5vw,3.6rem);line-height:1.15;color:var(--ink);}
+header .rule{margin:1.1rem auto 0;width:3.5rem;height:3px;background:var(--accent);}
 header .abstract{max-width:60ch;margin:1.6rem auto 0;color:var(--dim);font-style:italic;font-size:clamp(1rem,1.4vw,1.25rem);}
+
+.header-thumb{margin:0 auto 1.6rem;max-width:min(100%,16rem);border:1px solid color-mix(in srgb, var(--accent) 40%, transparent);padding:8px;border-radius:var(--radius);background:color-mix(in srgb, var(--accent) 4%, transparent);}
+.header-thumb img{display:block;width:100%;height:auto;max-height:22rem;object-fit:cover;border-radius:calc(var(--radius) * .6);filter:var(--img-filter);}
+.header-thumb figcaption{margin-top:.5rem;font-size:.7rem;color:var(--dim);text-align:center;letter-spacing:.03em;}
 
 main{max-width:72rem;margin:0 auto;padding:0 clamp(1.5rem,5vw,3rem) 6rem;}
 .grid{
@@ -37,16 +84,18 @@ main{max-width:72rem;margin:0 auto;padding:0 clamp(1.5rem,5vw,3rem) 6rem;}
 
 .card{
 	position:relative;
-	border:1px solid rgba(198,161,91,.25);
+	border:1px solid color-mix(in srgb, var(--accent) 25%, transparent);
 	padding:1.4rem 1.5rem 1.6rem;
 	display:flex;flex-direction:column;gap:.7rem;
+	border-radius:var(--radius);
 	transition:border-color .2s ease,transform .2s ease;
 }
 .card:hover{border-color:var(--accent);transform:translateY(-2px);}
-.card .thumb{border:1px solid rgba(198,161,91,.5);padding:6px;align-self:flex-start;max-width:9rem;}
-.card .thumb img{display:block;width:100%;height:auto;aspect-ratio:3/4;object-fit:cover;filter:grayscale(1) contrast(1.15) brightness(.92) sepia(.12);}
-.card .kicker{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);}
-.card h2{font-size:1.35rem;line-height:1.25;}
+.card .thumb{border:1px solid color-mix(in srgb, var(--accent) 50%, transparent);padding:6px;align-self:flex-start;max-width:9rem;border-radius:var(--radius);}
+.card .thumb img{display:block;width:100%;height:auto;aspect-ratio:3/4;object-fit:cover;border-radius:calc(var(--radius) * .6);filter:var(--img-filter);}
+.kicker{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);}
+header .kicker{margin-top:.6rem;}
+.card h2{font-family:var(--display);font-size:1.35rem;line-height:1.25;}
 .card h2 a{color:var(--ink);}
 .card h2 a::after{content:"";position:absolute;inset:0;}
 .card .excerpt{font-size:1rem;line-height:1.5;color:var(--dim);flex:1;}
@@ -57,15 +106,34 @@ main{max-width:72rem;margin:0 auto;padding:0 clamp(1.5rem,5vw,3rem) 6rem;}
 
 .empty{text-align:center;color:var(--dim);font-style:italic;padding:4rem 1rem;}
 
-.gn-breadcrumb{display:block;position:static;max-width:none;white-space:normal;opacity:.75;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin:0 0 1rem;}
+.gn-breadcrumb{display:block;position:static;max-width:none;white-space:normal;opacity:.75;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin:0 0 1rem;color:var(--dim);}
+.gn-breadcrumb a{color:var(--dim);}
+.gn-breadcrumb a:hover{color:var(--accent);}
 .gn-altpaths{position:static;max-width:none;margin:.3rem 0 0;}
-main .gn-related{max-width:72rem;margin:0 auto 3rem;padding:1.2rem clamp(1.5rem,5vw,3rem) 0;border-top:1px solid rgba(198,161,91,.25);}
+main .gn-related{max-width:72rem;margin:0 auto 3rem;padding:1.2rem clamp(1.5rem,5vw,3rem) 0;border-top:1px solid color-mix(in srgb, var(--accent) 25%, transparent);}
+
+#skinbar{position:fixed;top:1rem;right:1.1rem;z-index:70;display:flex;gap:.4rem;align-items:center;padding:.4rem .55rem;border:1px solid color-mix(in srgb, var(--accent) 25%, transparent);border-radius:999px;background:color-mix(in srgb, var(--bg) 85%, transparent);}
+.skin-dot{width:1.05rem;height:1.05rem;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;opacity:.6;transition:opacity .15s ease,border-color .15s ease,transform .15s ease;}
+.skin-dot:hover{opacity:1;transform:scale(1.15);}
+.skin-dot.active{opacity:1;border-color:var(--ink);box-shadow:0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);}
 </style>
-<body>
+<body data-skin="<% if knot.skin %><% knot.skin %><% else %>cyberpunk<% end %>">
+	<div id="skinbar">
+		<button class="skin-dot" data-skin="classical"  style="background:#a9802f" title="Classical"></button>
+		<button class="skin-dot" data-skin="modern"     style="background:#1f6feb" title="Modern"></button>
+		<button class="skin-dot" data-skin="noir"       style="background:#c9c9d1" title="Noir"></button>
+		<button class="skin-dot" data-skin="synthwave"  style="background:#ff2fb0" title="Synthwave"></button>
+		<button class="skin-dot" data-skin="cyberpunk"  style="background:#00ff9c" title="Cyberpunk"></button>
+	</div>
+
 	<header>
 		<% INCLUDE modules/graph_breadcrumb.tt %>
 		<% ancestors = knot.knot_name.split('/') %>
+		<% if knot.img_url %>
+		<figure class="header-thumb"><img src="<% knot.img_url %>" alt="<% knot.img_legend %>" loading="lazy"/><% if knot.img_legend %><figcaption><% knot.img_legend %></figcaption><% end %></figure>
+		<% end %>
 		<h1><% ancestors.last %><span class="rule"></span></h1>
+		<% if knot.epoch %><div class="kicker"><% knot.date %> &middot; <% knot.ae_epoch %></div><% end %>
 		<% if knot.knot_content %><div class="abstract"><% knot.knot_content %></div><% end %>
 	</header>
 
@@ -78,8 +146,8 @@ main .gn-related{max-width:72rem;margin:0 auto 3rem;padding:1.2rem clamp(1.5rem,
 					<% if child.img_url %>
 					<figure class="thumb"><img src="<% child.img_url %>" alt="<% child.img_legend %>" loading="lazy"/></figure>
 					<% end %>
-					<% if child.date %><div class="kicker"><% child.date %></div><% end %>
-					<h2><a href="/<% child.knot_id %>/kolleg"><% child.knot_name.short_name %></a></h2>
+					<% if child.epoch %><div class="kicker"><% child.date %> &middot; <% child.ae_epoch %></div><% end %>
+					<h2><a href="/<% child.knot_id %>/mainframe"><% child.knot_name.short_name %></a></h2>
 					<% if child.knot_content %><div class="excerpt"><% child.knot_content.remove_html_tags | truncate(180) %></div><% end %>
 					<div class="meta">
 						<% if child.ogg_url %><span class="rec">&#9679; recording</span><% else %><span></span><% end %>
@@ -99,5 +167,25 @@ main .gn-related{max-width:72rem;margin:0 auto 3rem;padding:1.2rem clamp(1.5rem,
 	</div>
 
 	<img id="brand" src="<% if knot.logo %><% knot.logo %><% else %>/images/udk_logo.svg<% end %>" alt=""/>
+
+	<script>
+	(function(){
+		// skin: localStorage wins (shared "mainframe_skin" key, same as
+		// mainframe.tt) so a choice made on a deck or its overview here
+		// stays in sync; falls back to this knot's own server-rendered
+		// default (data-skin, already set to avoid a flash).
+		var SKIN_KEY = 'mainframe_skin';
+		var skinDots = Array.prototype.slice.call(document.querySelectorAll('.skin-dot'));
+		function applySkin(skin){
+			document.body.dataset.skin = skin;
+			try { localStorage.setItem(SKIN_KEY, skin); } catch (e) {}
+			skinDots.forEach(function(d){ d.classList.toggle('active', d.dataset.skin === skin); });
+		}
+		var storedSkin;
+		try { storedSkin = localStorage.getItem(SKIN_KEY); } catch (e) {}
+		applySkin(storedSkin || document.body.dataset.skin || 'cyberpunk');
+		skinDots.forEach(function(d){ d.addEventListener('click', function(){ applySkin(d.dataset.skin); }); });
+	})();
+	</script>
 </body>
 </html>

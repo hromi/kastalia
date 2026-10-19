@@ -1,0 +1,143 @@
+<%#
+  Shared skin system for the admin-side templates (knot.tt, zeitgeist.tt,
+  last.tt, bounds.tt/bookmarks). Same 5 named skins as mainframe.tt
+  (classical -> cyberpunky), so picking "noir" here and in a presentation
+  deck means the same thing -- but tuned for dense, editable, text-heavy
+  admin UI rather than a full-screen slide: no scanlines/flicker/corner
+  brackets, glow kept subtle, --card/--border derived from --bg/--fg via
+  color-mix() instead of hand-picked per skin, so adding a 6th skin later
+  only means adding 5-6 variable lines, not a whole new stylesheet.
+  Include this once in the page head, then include the admin_skin_picker
+  module somewhere visible in the body, and the page's OWN CSS just uses
+  var(--bg)/var(--fg)/var(--accent)/var(--highlight)/var(--muted)/
+  var(--card)/var(--border)/var(--danger)/var(--display)/var(--bodyfont)
+  like any other token system.
+%>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@500;600;700&family=Orbitron:wght@500;700;800&family=JetBrains+Mono:wght@400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+@font-face { font-family:"Cyberpunk"; src:url(/Cyberpunk.otf); font-display:swap; }
+
+body{
+	--bg:#f6f7f8; --fg:#14181a; --accent:hsl(216 100% 50%); --highlight:hsl(264 100% 50%); --muted:hsl(0 0% 40%);
+	--display:'Inter',system-ui,sans-serif; --bodyfont:'Inter',system-ui,sans-serif; --glow:none; --radius:10px;
+}
+body[data-skin="classical"]{
+	--bg:#f4efe2; --fg:#201b12; --accent:#a9802f; --highlight:#6b4a9a; --muted:#7d7259;
+	--display:'Cinzel',Georgia,serif; --bodyfont:'Cormorant Garamond',Georgia,serif; --glow:none; --radius:12px;
+}
+body[data-skin="modern"]{
+	--bg:#f6f7f8; --fg:#14181a; --accent:#1f6feb; --highlight:#e8604c; --muted:#5c6468;
+	--display:'Inter',system-ui,sans-serif; --bodyfont:'Inter',system-ui,sans-serif; --glow:none; --radius:10px;
+}
+body[data-skin="noir"]{
+	--bg:#111113; --fg:#e9e9ea; --accent:#c9c9d1; --highlight:#8f8f98; --muted:#6b6b70;
+	--display:'Playfair Display',Georgia,serif; --bodyfont:'Inter',system-ui,sans-serif; --glow:0 0 8px rgba(201,201,209,.2); --radius:6px;
+}
+body[data-skin="synthwave"]{
+	--bg:#1a0b2e; --fg:#ffd9f3; --accent:#ff2fb0; --highlight:#20d9fe; --muted:#9a6fae;
+	--display:'Orbitron','JetBrains Mono',monospace; --bodyfont:'JetBrains Mono',monospace; --glow:0 0 6px rgba(255,47,176,.45); --radius:4px;
+}
+body[data-skin="cyberpunk"]{
+	--bg:#030504; --fg:#c9ffe6; --accent:#00ff9c; --highlight:#ff2bd6; --muted:#4f8a71;
+	--display:'Cyberpunk','JetBrains Mono',monospace; --bodyfont:'Share Tech Mono','JetBrains Mono',monospace; --glow:0 0 6px rgba(0,255,156,.4); --radius:4px;
+}
+/* derived, not per-skin -- one rule covers all 5 */
+body{ --card:color-mix(in srgb, var(--fg) 6%, var(--bg)); --border:color-mix(in srgb, var(--fg) 14%, transparent); --danger:color-mix(in srgb, #e0372d 82%, var(--bg)); }
+
+html,body{background:var(--bg);color:var(--fg);transition:background-color .2s ease,color .2s ease;}
+body{font-family:var(--bodyfont);}
+a{color:var(--accent);}
+a:hover{color:var(--highlight);}
+h1,h2,h3{font-family:var(--display);text-shadow:var(--glow);}
+
+/* ---- shared admin-chrome components, used by knot/zeitgeist/last/bounds ---- */
+input[type=text],input[type=number],textarea,select{
+	font-family:inherit;font-size:.92rem;border:1px solid var(--border);border-radius:6px;
+	background:var(--bg);color:var(--fg);padding:.35rem .5rem;
+}
+input[type=submit],button{
+	font-family:inherit;font-size:.85rem;border:1px solid var(--border);border-radius:6px;
+	background:var(--card);color:var(--fg);padding:.4rem .8rem;cursor:pointer;
+}
+input[type=submit]:hover,button:hover{border-color:var(--accent);color:var(--accent);}
+
+header.kadmin-topbar{padding:.6rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem;font-size:.85rem;}
+
+.kcard{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:.9rem 1rem;margin-bottom:1rem;}
+.kcard h2{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 .6rem;font-weight:700;display:flex;align-items:center;justify-content:space-between;text-shadow:none;}
+.kcard h2 button{font-size:.72rem;padding:.2rem .5rem;}
+
+.klist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.45rem;}
+.klist li{border-bottom:1px solid var(--border);padding-bottom:.45rem;font-size:.86rem;}
+.klist li:last-child{border-bottom:0;padding-bottom:0;}
+.klist .pred{color:var(--muted);font-style:italic;}
+.klist .wt{color:var(--muted);font-size:.8rem;}
+.klist .kid{color:var(--muted);font-size:.78rem;}
+.klist img{display:block;max-width:220px;margin-top:.3rem;border-radius:6px;}
+
+.kpills{display:flex;flex-wrap:wrap;gap:.4rem;}
+.kpills a{border:1px solid var(--border);border-radius:999px;padding:.3rem .7rem;font-size:.82rem;color:var(--fg);}
+.kpills a:hover{border-color:var(--accent);color:var(--accent);}
+
+details.kpanel{border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;}
+details.kpanel summary{cursor:pointer;font-weight:600;font-size:.88rem;}
+details.kpanel[open] summary{margin-bottom:.6rem;}
+details.kpanel form,details.kpanel>*{font-size:.9rem;}
+
+.delete_bound{cursor:pointer;color:var(--danger);opacity:.55;margin-right:.3rem;}
+.delete_bound:hover{opacity:1;}
+
+/* #brahma / .toolbar_element come from layouts/brahma.tt, shared by many
+   templates -- it has no styling of its own and used to lean entirely on
+   the old global /css/oikos.css + /css/fibel/style.css (a loud fixed
+   min(4.2vw,4.2vh) purple-icon-bar look designed for a kiosk-style student
+   template). Styling it here once means every admin page that includes
+   this module gets a consistent, themed toolbar instead of each page
+   needing its own copy -- or, worse, a bare unstyled one. */
+#brahma{border-bottom:1px solid var(--border);background:var(--card);}
+#brahma > div{display:flex !important;flex-wrap:wrap;align-items:center;gap:.4rem;padding:.5rem 1rem;width:auto !important;}
+.toolbar_element{display:flex;}
+.toolbar_element a,.toolbar_element button{
+	display:inline-flex;align-items:center;gap:.3rem;font-size:1rem !important;
+	border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--fg) !important;
+	padding:.3rem .55rem;line-height:1;text-shadow:none !important;min-width:0 !important;min-height:0 !important;
+}
+.toolbar_element a:hover,.toolbar_element button:hover{border-color:var(--accent);color:var(--accent) !important;}
+.toolbar_element form{display:flex;align-items:center;gap:.3rem;margin:0;}
+.toolbar_element input[type=text]{width:10rem !important;}
+
+.w3-panel{border-radius:8px;padding:.6rem .9rem;margin:.6rem 1rem;font-size:.9rem;}
+.w3-panel h3{margin:0 0 .2rem;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;text-shadow:none;}
+.w3-panel p{margin:0;}
+.w3-green{background:hsl(140 55% 94%);color:hsl(140 60% 22%);border:1px solid hsl(140 45% 72%);}
+.w3-red{background:hsl(0 70% 96%);color:hsl(0 60% 32%);border:1px solid hsl(0 55% 78%);}
+@media (prefers-color-scheme: dark){
+	.w3-green{background:hsl(140 35% 14%);color:hsl(140 55% 78%);border-color:hsl(140 35% 28%);}
+	.w3-red{background:hsl(0 35% 15%);color:hsl(0 65% 80%);border-color:hsl(0 35% 30%);}
+}
+
+/* skin picker: small dot row, same mechanism (and same localStorage key,
+   so it's one choice shared) as mainframe.tt */
+#skin-picker{display:flex;gap:.35rem;align-items:center;}
+#skin-picker .skin-dot{width:1rem;height:1rem;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;opacity:.6;transition:opacity .15s ease,border-color .15s ease,transform .15s ease;}
+#skin-picker .skin-dot:hover{opacity:1;transform:scale(1.15);}
+#skin-picker .skin-dot.active{opacity:1;border-color:var(--fg);box-shadow:0 0 5px color-mix(in srgb, var(--accent) 60%, transparent);}
+</style>
+<script>
+(function(){
+	var SKIN_KEY = 'mainframe_skin'; // same key as mainframe.tt -- one skin choice across the whole app
+	function applySkin(skin){
+		document.body.dataset.skin = skin;
+		try { localStorage.setItem(SKIN_KEY, skin); } catch (e) {}
+		document.querySelectorAll('.skin-dot').forEach(function(d){ d.classList.toggle('active', d.dataset.skin === skin); });
+	}
+	document.addEventListener('DOMContentLoaded', function(){
+		var stored;
+		try { stored = localStorage.getItem(SKIN_KEY); } catch (e) {}
+		applySkin(stored || document.body.dataset.skin || 'modern');
+		document.querySelectorAll('.skin-dot').forEach(function(d){ d.addEventListener('click', function(){ applySkin(d.dataset.skin); }); });
+	});
+})();
+</script>

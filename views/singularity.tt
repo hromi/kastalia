@@ -1,0 +1,129 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><% knot.knot_name %> :: singularity</title>
+<% INCLUDE modules/graph_seo_head.tt %>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{ --bg:#05060a; --ink:#e7ecf5; --dim:#6b7489; --accent:#ffb454; }
+*{box-sizing:border-box;}
+html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;}
+body{color:var(--ink);font-family:'Space Grotesk',system-ui,sans-serif;}
+header{position:fixed;top:0;left:0;right:0;z-index:5;padding:1.1rem 1.3rem .6rem;background:linear-gradient(to bottom, var(--bg) 60%, transparent);}
+header h1{font-size:clamp(1.05rem,2.6vw,1.5rem);font-weight:500;margin:0;}
+header .abstract{color:var(--dim);font-size:.82rem;max-width:60ch;margin:.3rem 0 0;}
+.gn-breadcrumb{position:static;max-width:none;white-space:normal;opacity:.75;color:var(--dim);font-size:.72rem;display:block;margin-top:.4rem;}
+.gn-breadcrumb a{color:var(--dim);}
+.gn-breadcrumb a:hover{color:var(--accent);}
+.gn-breadcrumb .gn-current{color:var(--ink);}
+.gn-altpaths{position:static;max-width:none;color:var(--dim);font-size:.64rem;}
+
+svg{display:block;width:100vw;height:100vh;}
+.axis path, .axis line{stroke:#1c2130;}
+.axis text{fill:var(--dim);font-size:11px;}
+.node{cursor:pointer;}
+.node circle{stroke:var(--bg);stroke-width:1px;}
+.node:hover circle{stroke:var(--ink);stroke-width:1.5px;}
+.node text{fill:var(--ink);font-size:10px;pointer-events:none;opacity:0;transition:opacity .15s ease;}
+.node:hover text{opacity:1;}
+
+#tooltip{
+	position:fixed;pointer-events:none;z-index:20;
+	background:#10131c;border:1px solid #2a3144;border-radius:8px;
+	padding:.5rem .7rem;max-width:280px;font-size:.78rem;color:var(--ink);
+	box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:0;transition:opacity .1s ease;
+}
+#tooltip .tt-date{color:var(--accent);font-size:.72rem;letter-spacing:.04em;margin-bottom:.2rem;}
+
+#legend{position:fixed;bottom:1rem;left:1rem;z-index:5;font-size:.72rem;color:var(--dim);max-width:46vw;}
+#legend .item{display:inline-flex;align-items:center;gap:.35rem;margin:0 .7rem .35rem 0;}
+#legend .swatch{width:9px;height:9px;border-radius:50%;display:inline-block;}
+#empty{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-style:italic;}
+</style>
+</head>
+<body>
+<header>
+	<h1><% knot.knot_name.short_name %></h1>
+	<% if knot.knot_content %><p class="abstract"><% knot.knot_content.remove_html_tags | truncate(180) %></p><% end %>
+	<% INCLUDE modules/graph_breadcrumb.tt %>
+</header>
+<svg id="chart"></svg>
+<div id="tooltip"></div>
+<div id="legend"></div>
+
+<script>
+var data = <% knot.knot_id.get_timeline_json(500) %>;
+
+if (!data.length) {
+	document.getElementById('chart').replaceWith(Object.assign(document.createElement('div'), {id:'empty', textContent:'nothing dated here yet'}));
+} else {
+	var width = window.innerWidth, height = window.innerHeight;
+	var nowSec = Date.now() / 1000;
+	var YEAR = 365.2425 * 86400;
+
+	data.forEach(function(d){
+		var yearsAgo = (nowSec - d.epoch) / YEAR;
+		d.yearsAgo = Math.max(yearsAgo, 0.4);
+		d.year = Math.round(nowSec / YEAR + 1970 - d.yearsAgo);
+	});
+
+	var maxYearsAgo = d3.max(data, function(d){ return d.yearsAgo; });
+	var x = d3.scaleLog().domain([maxYearsAgo * 1.15, 0.35]).range([50, width - 40]).clamp(true);
+
+	var nowYear = Math.round(nowSec / YEAR + 1970);
+	var minYear = nowYear - Math.ceil(maxYearsAgo);
+	var landmarks = [-2700,-1000,-500,1,500,1000,1500,1700,1800,1900,1950,1980,2000,2010,2020].filter(function(y){
+		return y >= minYear && y <= nowYear;
+	});
+	landmarks.push(nowYear);
+
+	var sections = Array.from(new Set(data.map(function(d){ return d.section; })));
+	var color = d3.scaleOrdinal().domain(sections).range(d3.quantize(d3.interpolateRainbow, Math.max(sections.length,3)));
+
+	var svg = d3.select('#chart');
+	svg.append('g').attr('class','axis').attr('transform','translate(0,'+(height-34)+')')
+		.call(d3.axisBottom(x).tickValues(landmarks.map(function(y){ return nowYear - y; })).tickFormat(function(d,i){
+			var yr = landmarks[i];
+			return yr === nowYear ? 'now' : (yr < 0 ? (-yr)+' BC' : yr);
+		}));
+
+	var sim = d3.forceSimulation(data)
+		.force('x', d3.forceX(function(d){ return x(d.yearsAgo); }).strength(1))
+		.force('y', d3.forceY(height/2 - 20).strength(.04))
+		.force('collide', d3.forceCollide(7))
+		.stop();
+	for (var i=0; i<120; i++) sim.tick();
+
+	var tooltip = d3.select('#tooltip');
+	var node = svg.append('g').selectAll('g').data(data).enter().append('g')
+		.attr('class','node')
+		.attr('transform', function(d){ return 'translate('+d.x+','+d.y+')'; });
+
+	node.append('circle').attr('r', 6).attr('fill', function(d){ return color(d.section); });
+	node.append('text').attr('dx', 9).attr('dy', '.32em').text(function(d){ return d.name; });
+
+	node.on('mousemove', function(event, d){
+		tooltip.style('opacity', 1)
+			.style('left', (event.clientX + 14) + 'px')
+			.style('top', (event.clientY + 10) + 'px')
+			.html('<div class="tt-date">'+(d.year<0 ? (-d.year)+' BC' : d.year)+' &middot; '+d.section_name+'</div><div>'+d.name+'</div>');
+	}).on('mouseleave', function(){ tooltip.style('opacity', 0); })
+	  .on('click', function(event, d){ window.location = '/'+d.id+'.html'; });
+
+	var legend = d3.select('#legend');
+	sections.forEach(function(s){
+		var name = data.find(function(d){ return d.section === s; }).section_name;
+		var item = legend.append('span').attr('class','item');
+		item.append('span').attr('class','swatch').style('background', color(s));
+		item.append('span').text(name);
+	});
+
+	window.addEventListener('resize', function(){ location.reload(); });
+}
+</script>
+</body>
+</html>

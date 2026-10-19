@@ -1,0 +1,7 @@
+<div id="skin-picker" title="skin">
+	<button type="button" class="skin-dot" data-skin="classical"  style="background:#a9802f" title="Classical"></button>
+	<button type="button" class="skin-dot" data-skin="modern"     style="background:#1f6feb" title="Modern"></button>
+	<button type="button" class="skin-dot" data-skin="noir"       style="background:#c9c9d1" title="Noir"></button>
+	<button type="button" class="skin-dot" data-skin="synthwave"  style="background:#ff2fb0" title="Synthwave"></button>
+	<button type="button" class="skin-dot" data-skin="cyberpunk"  style="background:#00ff9c" title="Cyberpunk"></button>
+</div>

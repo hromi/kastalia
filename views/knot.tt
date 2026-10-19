@@ -1,0 +1,533 @@
+<%use date%>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%knot.knot_name%></title>
+
+<script type="text/javascript" src="/tinymce/tinymce.min.js"></script>
+<script type="text/javascript">
+  tinyMCE.init({
+    mode : "textareas",
+    editor_deselector : "no-tinymce",
+    plugins: "code lists advlist image table",
+    forced_root_block : false,
+    relative_urls : false,
+    remove_script_host : false,
+    convert_urls : true,
+    height:"300"
+  });
+</script>
+
+<%if a.font_url%>
+<style>
+@font-face { font-family: knotFont; src: url(<%a.font_url%>); }
+* { font-family: knotFont; font-size: 1vw; }
+.mceEditor > table { height:1200px !important; }
+</style>
+<%end%>
+
+<% INCLUDE "modules/jquery_default.tt" %>
+
+<% INCLUDE modules/admin_skin.tt %>
+<style>
+/* knot.tt-specific rules only -- shared admin chrome (toolbar, .kcard,
+   .klist, .kpills, buttons/inputs, w3-panel, details.kpanel, .delete_bound)
+   now lives in modules/admin_skin.tt so zeitgeist/last/bounds share it too. */
+:root{ --m:1rem; }
+*{box-sizing:border-box;}
+body{margin:0;line-height:1.5;font-size:15px;}
+a{text-decoration:none;}
+
+.kadmin-layout{display:grid;grid-template-columns:280px 1fr;gap:var(--m);max-width:1400px;margin:0 auto;padding:var(--m);align-items:start;}
+@media (max-width:860px){ .kadmin-layout{grid-template-columns:1fr;} }
+
+[contenteditable=true]{outline-offset:2px;border-radius:3px;}
+[contenteditable=true]:hover{outline:1px dashed var(--border);}
+[contenteditable=true]:focus{outline:2px solid var(--accent);}
+.attrs .attr-key{color:var(--muted);font-size:.78rem;display:block;}
+
+.kname{font-size:1.35rem;font-weight:700;margin:0 0 .6rem;word-break:break-word;}
+.kcontent{min-height:4em;padding:.4rem;border-radius:6px;}
+.kcontent:empty::before{content:"(empty -- click to write)";color:var(--muted);}
+
+.element-image img{max-width:100%;border-radius:8px;margin:.6rem 0;}
+.video-embed video{max-width:61%;border-radius:8px;}
+
+.kpills{display:flex;flex-wrap:wrap;gap:.4rem;}
+.kpills a{border:1px solid var(--border);border-radius:999px;padding:.3rem .7rem;font-size:.82rem;color:var(--fg);}
+.kpills a:hover{border-color:var(--accent);color:var(--accent);}
+
+.kactions{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.7rem;}
+.kactions form{margin:0;}
+
+.kpanels{display:flex;flex-direction:column;gap:.5rem;}
+details.kpanel{border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;}
+details.kpanel summary{cursor:pointer;font-weight:600;font-size:.88rem;}
+details.kpanel[open] summary{margin-bottom:.6rem;}
+details.kpanel form,details.kpanel>*{font-size:.9rem;}
+
+#target_autocomplete{position:relative;display:inline-block;}
+#target_suggestions{list-style:none;margin:2px 0 0;padding:0;position:absolute;z-index:1000;left:0;top:100%;
+	min-width:320px;max-height:260px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);
+	border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.18);display:none;}
+#target_suggestions li{padding:.3rem .55rem;cursor:pointer;font-size:.85rem;}
+#target_suggestions li .sub{color:var(--muted);font-size:.82em;}
+#target_selected span{display:inline-block;background:var(--card);border:1px solid var(--border);border-radius:999px;
+	padding:.15rem .55rem;margin:0 .3rem .3rem 0;font-size:.8rem;}
+</style>
+</head>
+<body data-skin="modern">
+	<div id="brahma">
+		<% INCLUDE "layouts/brahma.tt" %>
+	</div>
+
+	<header class="kadmin-topbar">
+		<%include modules/materialized_path.tt%>
+		<span style="margin-left:auto;"><% INCLUDE modules/admin_skin_picker.tt %></span>
+	</header>
+
+	<div class="kadmin-layout">
+	<aside>
+		<div class="kcard">
+			<h2><%subjects.size%> Dendrites</h2>
+			<ul class="klist">
+				<% FOREACH subject IN subjects%>
+					<li>
+						<span class="delete_bound" bid="<%subject.bound_id%>" title="destroy this relation">&#10060;</span>
+						<a href="/<%subject.subject_id%>/knot">&#128279;</a>
+						<span kid="<%subject.subject_id%>" class="update_related" contenteditable="true"><%subject.subject_name%></span>
+						<span class="pred">(<%subject.predicate%>)</span>
+						<span class="wt">weight <span contenteditable="true" class="relationship_strength" bid="<%subject.bound_id%>"><%subject.ord%></span></span>
+					</li>
+				<% END %>
+			</ul>
+		</div>
+
+		<div class="kcard attrs">
+			<h2>Attributes</h2>
+			<ul class="klist">
+				<% FOREACH key IN a.keys%>
+					<li>
+						<span class="attr-key"><%key%></span>
+						<%if key=='ogg_url' or key=='default_ogg_woman' or key=='default_ogg_man' or key=='speech_url'%>
+							<audio controls style="width:100%;">
+							  <source src="<%a.$key%>" type="audio/wav">
+							</audio>
+						<%elsif key.match('_url$')%>
+							<a href="<%a.$key.safe_url%>"><%a.$key%></a>
+						<%elsif key=='next_exercise'%>
+							<a href="/<%a.next_exercise%>"><%a.next_exercise%></a>
+						<%elsif key=='template'%>
+							<a href="/templates/<%a.$key%>.tt"><%a.$key%></a>
+						<%elsif key=='epoch'%>
+							<%# raw unix timestamp -- not friendly to hand-edit as text, see the
+							    "Session Date" calendar control below instead, which writes this
+							    same attribute. attach_attributes() derives date/ae_epoch straight
+							    onto the knot itself (not onto `a`, which is a separate raw hstore
+							    decode -- see Main.pm), so read them off `knot`, not `a`, here. %>
+							<%knot.date%> &middot; <%knot.ae_epoch%>
+						<%elsif key=='transcription_candidates'%>
+							<select id="transcriptions"></select>
+							<script>
+								transcription_candidates=<%a.$key.safe_js_array%>;
+								var options = transcription_candidates.map(function(val, ind){
+								    $('#transcriptions').append($("<option></option>").val(val).text(val));
+								});
+								$('select').change(function() {$('#knot_content').html(this.value)});
+							</script>
+						<%else%>
+							<%if a.$key%>
+								<span kid="<%knot.knot_id%>" class="update_attribute" attr_name="<%key%>" contenteditable="true"><%a.$key%></span>
+							<%else%>
+								<span kid="<%knot.knot_id%>" class="update_attribute" attr_name="<%key%>" contenteditable="true">&nbsp;&nbsp;</span>
+							<%end%>
+						<%end%>
+					</li>
+				<% END %>
+			</ul>
+			<div class="kpanel" style="margin-top:.7rem;padding:.6rem .7rem;border:1px solid var(--border);border-radius:6px;">
+				<strong style="font-size:.82rem;">Session / Creation Date</strong>
+				<div id="epoch_display" style="font-size:.85rem;margin:.3rem 0;">
+					<% if knot.epoch %><%knot.date%> &middot; <%knot.ae_epoch%><% else %><span style="color:var(--muted);">not set</span><% end %>
+				</div>
+				<%if user_id%>
+					<input type="date" id="epoch_picker" value="<% if knot.epoch %><%date.format(knot.epoch.epoch_int,'%Y-%m-%d')%><%end%>"/>
+				<%end%>
+			</div>
+			<%if user_id%>
+				<details class="kpanel" style="margin-top:.7rem;">
+					<summary>Add / Modify Attribute</summary>
+					<form method="post" action="/create_attribute/">
+						Name: <input type="text" name="name"/><br/>
+						Value: <input type="text" name="value"/>
+						<input type="hidden" name="knot_id" value="<%knot.knot_id%>"/><br/>
+						<label><input type="checkbox" name="apply_children"> apply on <select name="predicate" class="predicate"><%include modules/predicatelist.tt%></select> objects</label><br/>
+						<label><input type="checkbox" name="apply_grandchildren"> apply on 2 generations</label><br/>
+						<input type="submit" value="Add / Modify Attribute"/>
+					</form>
+				</details>
+			<%end%>
+		</div>
+	</aside>
+
+	<main>
+		<div class="kname" contenteditable="true" id="knot_name"><%knot.knot_name%></div>
+		<div class="kcontent" contenteditable="true" id="knot_content"><% if !knot.knot_content%>::<%end%><%knot.knot_content%></div>
+
+		<% if a.img_url %>
+			<div class="element-image"><img src="<%a.img_url%>"/></div>
+		<%end%>
+		<% if a.screenshot_url %>
+			<div class="element-image"><img src="<%a.screenshot_url%>"/></div>
+		<%end%>
+		<% if a.fulltext_url %>
+			<iframe src="<%a.fulltext_url%>" type="application/pdf" style="width:100%; height:500px;border:1px solid var(--border);border-radius:8px;"></iframe>
+		<%end%>
+		<%if a.video_url%>
+			<div class="video-embed"><video controls autoplay loop src="<%a.video_url%>"/></div>
+		<%end%>
+
+		<%if user_id%>
+			<details class="kpanel" style="margin:.8rem 0;">
+				<summary>WYSIWYG editor</summary>
+				<form method="post" action="/update_content">
+					<input type="hidden" name="knot_id" value="<%knot.knot_id%>"/>
+					<textarea name="knot_content"><%knot.knot_content%></textarea>
+					<input type="submit" value="Save"/>
+				</form>
+			</details>
+
+			<div class="kcard">
+				<h2>Views</h2>
+				<div class="kpills">
+					<a href="/<%knot.knot_id%>">Default</a>
+					<a href="/view/<%knot.knot_id%>/knot/">&#129701; knot</a>
+					<a href="/view/<%knot.knot_id%>/explore/">&#8862; explore</a>
+					<a href="/view/<%knot.knot_id%>/baumhaus/">baumhaus</a>
+					<a href="/view/<%knot.knot_id%>/arbre/">&#127795; arbre</a>
+					<a href="/<%knot.knot_id%>/glasperlenspiel/">&#128218; glasperlenspiel</a>
+					<a href="/view/<%knot.knot_id%>/player/">player</a>
+					<a href="/view/<%knot.knot_id%>/musicrec/">&#127926; musicrec</a>
+					<a href="/view/<%knot.knot_id%>/play/" title="h&ouml;ren">&#128066; play</a>
+					<a href="/view/<%knot.knot_id%>/recite/" title="recite">&#127908; recite</a>
+					<%if knot.img_url%>
+						<a href="/view/<%knot.knot_id%>/annotate/">&#9997;&#65039; annotate</a>
+						<%if knot.annotation%>
+							<a href="/view/<%knot.knot_id%>/foliorec/">&#128220;&#128100; foliorec</a>
+							<a href="/view/<%knot.knot_id%>/folio/">&#128220; folio</a>
+						<%end%>
+					<%end%>
+					<a href="/view/<%knot.knot_id%>/read/" title="lesen">&#128100; read</a>
+					<a href="/<%knot.knot_id%>/paaren/" title="paaren">&#127918; paaren</a>
+					<a href="/<%knot.knot_id%>/test/" title="testen">&#128175; testen</a>
+					<a href="/<%knot.knot_id%>/learn/" title="lernen">&#128105;&#127964;&#8205;&#128187; trainieren</a>
+				</div>
+
+				<h2 style="margin-top:.8rem;">Presentation templates</h2>
+				<div class="kpills">
+					<a href="/<%knot.knot_id%>.kolleg" target="_blank" rel="noopener" title="elegant teaching deck">&#127891; kolleg</a>
+					<a href="/<%knot.knot_id%>.semester" target="_blank" rel="noopener" title="course/semester overview">&#128218; semester</a>
+					<a href="/<%knot.knot_id%>.fractal" target="_blank" rel="noopener" title="exponential/fractal timeline deck">&#127760; fractal</a>
+					<a href="/<%knot.knot_id%>.mainframe" target="_blank" rel="noopener" title="cyberpunk deck, 5 skins, classroom cast + live audio">&#128187; mainframe</a>
+					<a href="/<%knot.knot_id%>.linktree" target="_blank" rel="noopener" title="minimalist link list">&#128279; linktree</a>
+				</div>
+
+				<h2 style="margin-top:.8rem;">Domain-canonical views</h2>
+				<div class="kpills">
+					<a href="/<%knot.knot_id%>.console" target="_blank" rel="noopener" title="wizzion.com">&#128421; console</a>
+					<a href="/<%knot.knot_id%>.treehouse" target="_blank" rel="noopener" title="baumhaus.digital">&#127795; treehouse</a>
+					<a href="/<%knot.knot_id%>.arena" target="_blank" rel="noopener" title="naadam.info">&#127958; arena</a>
+					<a href="/<%knot.knot_id%>.samizdat" target="_blank" rel="noopener" title="refused.science">&#128240; samizdat</a>
+					<a href="/<%knot.knot_id%>.ledger" target="_blank" rel="noopener" title="giver.eu">&#128210; ledger</a>
+					<a href="/<%knot.knot_id%>.offgrid" target="_blank" rel="noopener" title="teacher.solar">&#128267; offgrid</a>
+					<a href="/<%knot.knot_id%>.voyage" target="_blank" rel="noopener" title="puerto.life">&#9973; voyage</a>
+					<a href="/<%knot.knot_id%>.atlas" target="_blank" rel="noopener" title="udk.ai">&#128506;&#65039; atlas</a>
+					<a href="/<%knot.knot_id%>.network" target="_blank" rel="noopener" title="alignment.udk.ai">&#128375; network</a>
+					<a href="/<%knot.knot_id%>.greenhouse" target="_blank" rel="noopener" title="gardens.digital">&#127793; greenhouse</a>
+				</div>
+			</div>
+
+			<div class="kcard">
+				<h2>Actions</h2>
+				<div class="kactions">
+					<form method="post" action="/bookmark">
+						<input type="hidden" name="knot_id" value="<%knot.knot_id%>"/>
+						<input type="submit" value="Bookmark"/>
+					</form>
+					<form method="post" action="/split">
+						<input type="hidden" name="knot_id" value="<%knot.knot_id%>"/>
+						<input type="submit" value="Split"/>
+					</form>
+					<form method="post" action="/ocr_img">
+						<input type="hidden" name="knot_id" value="<%knot.knot_id%>"/>
+						<input type="submit" value="OCR"/>
+					</form>
+					<form method="post" action="/speech_segment">
+						<input type="hidden" name="knot_id" value="<%knot.knot_id%>"/>
+						<input type="submit" value="Segment & Transcribe Speech"/>
+					</form>
+				</div>
+
+				<div class="kpanels">
+					<details class="kpanel" id="create_child">
+						<summary>Add Related Knot</summary>
+						<form method="post" action="/insert/">
+							Name: <input style="width:80%" type="text" value="<%knot.knot_name%>/" name="name"/><br/>
+							Content: <textarea style="width:100%" name="content"></textarea>
+							<input type="hidden" name="parent_id" value="<%knot.knot_id%>"/><br/>
+							<select name="predicate" class="predicate"><%include modules/predicatelist.tt%></select>
+							<input type="submit" value="Add Related Knot"/>
+						</form>
+					</details>
+
+					<details class="kpanel" id="create_bound" open>
+						<summary>Establish Relation</summary>
+						<form method="post" action="/create_bound/">
+							<%knot.knot_name|replace('^.*\+\+','')%>
+							<select name="predicate" class="predicate"><%include modules/predicatelist.tt%></select>
+							id(s) <input type="text" name="target_id" id="target_id" value="<%t='container_id'%><%t.get_session_key%>" <%t='last_created_name'%>title="<%t.get_session_key%>"/>
+							<span id="target_autocomplete">
+								or start typing a name&hellip; <input type="text" id="target_search" autocomplete="off" style="width:220px;"/>
+								<ul id="target_suggestions"></ul>
+							</span>
+							<span id="target_selected"></span>
+							<input type="hidden" name="origin_id" value="<%knot.knot_id%>"/>
+							<br/>with strength: <input type="text" name="strength" value="1" style="width:4em;"/>
+							<label><input type="checkbox" name="flip_roles"> flip roles?</label>
+							<input type="submit" value="Create Bound"/>
+						</form>
+					</details>
+
+					<details class="kpanel" id="create_propagate">
+						<summary>Propagate</summary>
+						<form method="post" action="/propagate/">
+							<input type="hidden" name="kid" value="<%knot.knot_id%>">
+							Let's define "source set" (&#128690;) as those knots which are associated to <%knot.knot_name%> with predicate <select name="source" class="predicate"><option value="is_member">is_member</option></select>.<br/><br/>
+							Let's define "target set" (&#127919;) as those knots which are connected to &#128690; through <select name="target" class="predicate"><%include modules/predicatelist.tt%></select>.<br/><br/>
+							Let's define "replication set" (&#129516;) as those knots which are connected to &#128690; through predicate <select id="select_replicate" name="replicate" class="predicate"><%include modules/predicatelist.tt%></select> which is to be replicated.<br/><br/>
+							By clicking on "Propagate", you will create a set of bounds <b>&#129516; <span id="span_replicate">&#129516;</span> &#127919;</b>.<br/><br/>
+							<span style="color:var(--muted);font-size:.85em;">(e.g. choose "is_member" in the 1st select, "translates" in the 2nd, "illustrates" in the 3rd to add illustrations to new language lexicons)</span><br/><br/>
+							<input type="submit" value="Propagate"/>
+						</form>
+					</details>
+
+					<details class="kpanel" id="attach_file">
+						<summary>Attach File</summary>
+						<form method="post" action="/attach_file/" enctype="multipart/form-data">
+							<input type="file" name="data"/>
+							<input type="hidden" name="knot_id" value="<%knot.knot_id%>"/>
+							<input type="text" title="img_url, speech_url, fulltext_url, ogg_url" name="attribute_name" value="img_url"/>
+							<input type="submit" value="Attach File"/>
+						</form>
+					</details>
+
+					<details class="kpanel" id="knotize">
+						<summary>Knotize JSON</summary>
+						<form method="post" action="/knotize/" enctype="multipart/form-data">
+							<input type="hidden" name="parent_id" value="<%knot.knot_id%>"/>
+							Knotize a JSON presentation (e.g. generated by an AI) under <%knot.knot_name%>, so it
+							can be viewed right away (e.g. through baumhaus/player). Either a single object --
+							<code>{"name":"Talk","slides":[{"name":"Slide 1","content":"..."},...]}</code> --
+							which becomes a new child knot with its own sub-tree of slides, or a bare array of slide
+							objects, which are injected directly as children of <%knot.knot_name%>.<br/><br/>
+							Upload a .json file: <input type="file" name="json_file" accept="application/json,.json"/><br/>
+							...or paste it here instead:<br/>
+							<textarea class="no-tinymce" style="width:100%;height:220px;" name="json" placeholder='{"name":"My Talk","attributes":{"author":"..."},"slides":[{"name":"Slide 1","content":"<p>Hello</p>","attributes":{"img_url":"/image/..."}}]}'></textarea><br/>
+							<input type="submit" value="Knotize"/>
+						</form>
+					</details>
+				</div>
+			</div>
+		<%end%>
+
+		<div class="kcard">
+			<h2><%objects.size%> Axones <button type="button" id="flip_axons">Flip order</button></h2>
+			<ul class="klist" id="axon_list">
+				<% FOREACH object IN objects%>
+					<li>
+						<span class="delete_bound" bid="<%object.bound_id%>" title="destroy this relation">&#10060;</span>
+						this knot <span class="pred"><%object.predicate%></span>
+						<a href="/view/<%object.object_id%>/knot">&#128279;</a>
+						<span contenteditable="true" kid="<%object.object_id%>" class="update_related"><%object.object_name%></span>
+						<span class="kid">(ID: <span class="knot_id"><%object.object_id%></span> &middot; weight <span contenteditable="true" class="relationship_strength" bid="<%object.bound_id%>"><%object.ord%></span>)</span>
+						<%if object.img_url%><img src="<%object.img_url%>"><%end%>
+						<%if object.fulltext_url%><br/>with fulltext <a href="<%object.fulltext_url%>"><%object.fulltext_url%></a><%end%>
+						<%if object.ogg_url%>
+							<audio style="width:100%;" controls>
+							  <source src="<%object.ogg_url%>" type="audio/wav">
+							</audio>
+						<%end%>
+					</li>
+				<% END %>
+			</ul>
+		</div>
+	</main>
+	</div>
+
+<div id="shiva">
+	<% INCLUDE "modules/shiva.tt" %>
+</div>
+
+<script>
+<%if a.flip %>
+$( document ).ready(function() {
+    reorderAxons();
+});
+<%end%>
+
+function reorderAxons() {
+	var list = $('#axon_list');
+	var listItems = list.children('li');
+	list.append(listItems.get().reverse());
+}
+$('#flip_axons').click(reorderAxons);
+
+//populate target of "establish relation" form whenever knot_id is clicked upon
+$('.knot_id').click(function(e){
+     $("#target_id").val(e.target.innerHTML);
+});
+
+// "Establish Relation" autocomplete: type a few letters of a knot's name
+// instead of needing to already know its id. Deliberately does NOT touch
+// the existing #target_id text field's own value format (plain, optionally
+// comma-separated ids -- see /create_bound/ in Main.pm) -- picking a
+// suggestion just appends its id there, same as if you'd typed it by hand,
+// so multi-select works by searching+picking more than once, and manually
+// typing/pasting ids into #target_id still works exactly as before.
+(function(){
+	var $search = $('#target_search');
+	var $list = $('#target_suggestions');
+	var $ids = $('#target_id');
+	var $selected = $('#target_selected');
+	if (!$search.length) return;
+
+	var debounceTimer = null;
+	var activeIndex = -1;
+	var current = [];
+
+	function hideList(){ $list.hide().empty(); activeIndex = -1; current = []; }
+
+	function renderList(items){
+		current = items;
+		activeIndex = -1;
+		$list.empty();
+		if (!items.length){ $list.hide(); return; }
+		items.forEach(function(item, i){
+			// .text(), not .html() -- item.short_name/.name come straight from
+			// /search_knots/'s JSON, which is just a knot_name substring match
+			// with no escaping; any knot whose name contained HTML used to
+			// execute here the moment its substring matched someone's search.
+			var $li = $('<li>').attr('data-i', i);
+			$('<strong>').text(item.short_name).appendTo($li);
+			$('<span>').addClass('sub').text(' ' + item.name).appendTo($li);
+			$li.on('mouseenter', function(){ setActive(i); });
+			$li.on('mousedown', function(e){ e.preventDefault(); pick(item); });
+			$list.append($li);
+		});
+		$list.show();
+	}
+
+	function setActive(i){
+		activeIndex = i;
+		$list.children('li').css('background', '').eq(i).css('background', 'var(--bg)');
+	}
+
+	function pick(item){
+		var existing = ($ids.val() || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+		if (existing.indexOf(String(item.id)) === -1) existing.push(item.id);
+		$ids.val(existing.join(','));
+		var $chip = $('<span>').text(item.short_name + ' (' + item.id + ')');
+		$selected.append($chip);
+		$search.val('');
+		hideList();
+		$search.focus();
+	}
+
+	$search.on('input', function(){
+		var q = $search.val().trim();
+		clearTimeout(debounceTimer);
+		if (q.length < 2){ hideList(); return; }
+		debounceTimer = setTimeout(function(){
+			$.getJSON('/search_knots/', {q: q}, function(data){
+				if ($search.val().trim() !== q) return; // stale response, a newer query already superseded it
+				renderList(data || []);
+			}).fail(function(jqXHR){
+				// a broken/unparsable response (e.g. a bad-encoding bug server
+				// side) used to just show nothing with no clue why -- surface it.
+				if ($search.val().trim() !== q) return;
+				console.error('search_knots failed:', jqXHR.status, jqXHR.responseText);
+				$list.html('<li style="color:var(--danger);">search failed (' + jqXHR.status + ') -- see console</li>').show();
+			});
+		}, 200);
+	});
+
+	$search.on('keydown', function(e){
+		if (e.key === 'Escape'){ hideList(); return; }
+		if (!current.length) return;
+		if (e.key === 'ArrowDown'){ e.preventDefault(); setActive((activeIndex + 1) % current.length); }
+		else if (e.key === 'ArrowUp'){ e.preventDefault(); setActive((activeIndex - 1 + current.length) % current.length); }
+		else if (e.key === 'Enter'){ e.preventDefault(); if (activeIndex >= 0) pick(current[activeIndex]); }
+	});
+
+	$(document).on('click', function(e){
+		if (!$(e.target).closest('#target_autocomplete').length) hideList();
+	});
+})();
+
+$('#select_replicate').on('change', function() {
+  $("#span_replicate").text(this.value);
+});
+
+(function ($) {
+    $.fn.wysiwygEvt = function () {
+        return this.each(function () {
+            var $this = $(this);
+            var htmlold = $this.html();
+            $this.bind('blur', function () {
+                var htmlnew = $this.html();
+                if (htmlold !== htmlnew) {
+			if ($this.attr("class")=="relationship_strength") {
+				var bid = $(this).attr('bid');
+				var ord = $(this).html();
+				$.post("/api/ajax_change_ord/", {bid:bid,ord:ord});
+			}
+			else if ($this.attr("class")=="update_related") {
+				var kid = $(this).attr('kid');
+				$.post( "/api/ajax_update/"+kid,{knot_name:$(this).html()});
+			}
+			else if ($this.attr("class")=="update_attribute") {
+				var kid = $(this).attr('kid');
+				var attribute_name = $(this).attr('attr_name');
+				$.post( "/api/update_attribute/"+kid,{'name':attribute_name,'value':$(this).html()});
+			}
+			else {
+				var elements = {};
+				elements[$this.attr("id")] = htmlnew;
+				$.post( "/api/ajax_update/<%knot.knot_id%>",elements);
+			}
+                }
+            })
+        })
+    }
+})(jQuery);
+$('[contenteditable=true]').wysiwygEvt();
+$(".predicate").val("<%t='last_predicate'%><%t.get_session_key%>");
+
+$('#epoch_picker').on('change', function(){
+	var v = this.value; // "YYYY-MM-DD" or "" if cleared
+	if (!v) return;
+	var parts = v.split('-');
+	// anchor at UTC noon, not midnight -- the server derives a.date/a.ae_epoch
+	// via Perl's localtime(), so a midnight-UTC timestamp would decode to the
+	// PREVIOUS calendar day in any timezone behind UTC. Noon is far enough
+	// from both day boundaries to survive any real-world server timezone.
+	var ts = Math.floor(Date.UTC(+parts[0], +parts[1] - 1, +parts[2], 12, 0, 0) / 1000);
+	$.post('/api/update_attribute/<%knot.knot_id%>', {name: 'epoch', value: ts}, function(){
+		location.reload();
+	});
+});
+</script>
+</body>
+</html>

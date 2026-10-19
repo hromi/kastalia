@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><% knot.knot_name.short_name %></title>
+<% INCLUDE modules/graph_seo_head.tt %>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* same token system + list-of-links look as udk.ai's own homepage
+   (/var/www/udk.ai/index.html), so jumping from udk.ai -> /klasse feels
+   like the same site rather than a different app. */
+:root{
+	--m:1rem;
+	--bg:#fff; --fg:#000;
+	--accent:hsl(216 100% 50%); --highlight:hsl(264 100% 50%);
+	--muted:hsl(0 0% 50% / .6); --card:hsl(0 0% 96%);
+}
+@media (prefers-color-scheme: dark){
+	:root{ --bg:hsl(0 0% 8%); --fg:#fff; --accent:hsl(205 100% 50%); --highlight:hsl(244 100% 70%); --card:hsl(0 0% 12%); --muted:hsl(0 0% 70% / .7); }
+}
+<% if knot.kolleg_bg %>:root{ --bg:<% knot.kolleg_bg %> !important; }<% end %>
+<% if knot.kolleg_ink %>:root{ --fg:<% knot.kolleg_ink %> !important; }<% end %>
+<% if knot.kolleg_accent %>:root{ --accent:<% knot.kolleg_accent %> !important; }<% end %>
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);color:var(--fg);}
+body{
+	font-family:Inter,system-ui,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5;
+	max-width:68ch;margin:auto;padding:calc(var(--m)*1.6) var(--m) calc(var(--m)*2);
+}
+a{color:var(--accent);text-decoration:none;}
+a:hover,a:focus{color:var(--highlight);}
+hr{border:0;border-top:1px solid hsl(0 0% 50% / .2);margin:var(--m) 0;}
+.up{display:inline-block;font-size:.85rem;color:var(--muted);margin-bottom:.6rem;}
+.up:hover{color:var(--accent);}
+h1{font-size:1.5rem;font-weight:800;}
+.content{color:var(--fg);font-size:.98rem;margin-top:.6rem;}
+.content p{margin:0 0 .7em;}
+.content p:last-child{margin-bottom:0;}
+.content strong{color:var(--highlight);}
+footer{font-size:.8rem;color:var(--muted);margin-top:var(--m);}
+
+ul{list-style:none;}
+li.group{margin-top:var(--m);}
+li.group strong{font-size:1rem;}
+li.group .entry{display:block;margin-top:.3rem;}
+li.group .entry small{display:block;color:var(--muted);font-size:.82rem;font-weight:400;margin-top:.1rem;}
+li.group .ext{color:var(--muted);font-size:.8rem;margin-left:.2rem;}
+
+.qr-wrap{margin-top:calc(var(--m)*1.6);display:flex;align-items:center;gap:var(--m);background:var(--card);border-radius:.75rem;padding:var(--m);}
+.qr-box{background:#fff;padding:8px;border-radius:.5rem;width:88px;height:88px;flex:none;}
+.qr-box svg{display:block;width:100%;height:100%;}
+.qr-caption{color:var(--muted);font-size:.85rem;}
+</style>
+</head>
+<body>
+	<% if knot.parent_id %><a class="up" href="/<% knot.parent_id %>">&uarr; <% knot.parent_name.short_name %></a><% end %>
+	<h1><% knot.knot_name.short_name %></h1>
+	<% if knot.knot_content %><div class="content"><% knot.knot_content %></div><% end %>
+
+	<% seminars = [] %>
+	<% related  = [] %>
+	<% FOREACH o IN objects %>
+		<% IF o.predicate == 'is_parent' %><% seminars.push(o) %>
+		<% ELSIF o.predicate == 'is_linked' %><% related.push(o) %>
+		<% END %>
+	<% END %>
+
+	<% IF seminars.size or related.size %>
+	<hr>
+	<main>
+	<ul>
+	<% IF seminars.size %>
+		<li class="group"><strong>Seminars</strong>
+		<% FOREACH o IN seminars %>
+			<span class="entry">&rarr; <a href="/<% o.object_id %>"><% if o.icon %><% o.icon %> <% end %><% o.object_name.short_name %></a>
+			<% if o.schedule %><small><% o.schedule %></small><% end %></span>
+		<% END %>
+		</li>
+	<% END %>
+
+	<% IF related.size %>
+		<li class="group"><strong>Related</strong>
+		<% FOREACH o IN related %>
+			<span class="entry">&rarr; <a href="<% if o.external_url %><% o.external_url %><% else %>/<% o.object_id %><% end %>" <% if o.external_url %>target="_blank" rel="noopener"<% end %>><% if o.icon %><% o.icon %> <% end %><% o.object_name.short_name %></a><% if o.external_url %><span class="ext">&#8599;</span><% end %>
+			<% if o.schedule %><small><% o.schedule %></small><% end %></span>
+		<% END %>
+		</li>
+	<% END %>
+	</ul>
+	</main>
+	<% END %>
+
+	<hr>
+	<div class="qr-wrap">
+		<div class="qr-box" id="qr"></div>
+		<div class="qr-caption">Scan to open this page on your phone</div>
+	</div>
+
+	<footer><% if knot.author %><% knot.author %><% end %></footer>
+
+	<script src="/js/qrcode-generator.js"></script>
+	<script>
+	(function(){
+		var qr = qrcode(0, 'M');
+		qr.addData(window.location.href);
+		qr.make();
+		document.getElementById('qr').innerHTML = qr.createSvgTag(4, 0);
+	})();
+	</script>
+</body>
+</html>

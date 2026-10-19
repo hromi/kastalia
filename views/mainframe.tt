@@ -1,0 +1,904 @@
+<!doctype html>
+<%include modules/brahma.tt%>
+<% INCLUDE modules/graph_seo_head.tt skip_basic=1 %>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&family=Orbitron:wght@500;700;800&family=JetBrains+Mono:wght@400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+@font-face { font-family:"Cyberpunk"; src:url(/Cyberpunk.otf); font-display:swap; }
+
+/* ----------------------------------------------------------------------
+   5 skins, classical -> cyberpunky, selected via body[data-skin="..."].
+   Everything below (layout, nav, echoes panel, etc.) reads these custom
+   properties -- only this block differs between skins, so switching skin
+   never touches markup or JS, and the deck engine + echoes jump-links
+   behave identically no matter which look is active. Default/fallback
+   values live on plain `body` (used only if JS fails to set data-skin).
+   ---------------------------------------------------------------------- */
+body{
+	--bg:#030504; --ink:#c9ffe6; --dim:#4f8a71; --accent:#00ff9c; --accent2:#ff2bd6;
+	--display:'Cyberpunk','JetBrains Mono',monospace; --bodyfont:'Share Tech Mono','JetBrains Mono',monospace;
+	--glow:0 0 6px rgba(0,255,156,.55),0 0 18px rgba(0,255,156,.25);
+	--img-filter:grayscale(1) sepia(.45) hue-rotate(60deg) saturate(2.6) contrast(1.12) brightness(.82);
+	--scanline-display:block; --corner-display:block; --radius:2px;
+	--h1-transform:uppercase; --h1-tracking:.03em; --flicker:flicker 6s infinite;
+	--bg-image:radial-gradient(ellipse at 50% -10%, rgba(0,255,156,.08), transparent 60%);
+}
+body[data-skin="classical"]{
+	--bg:#f4efe2; --ink:#201b12; --dim:#7d7259; --accent:#a9802f; --accent2:#6b4a9a;
+	--display:'Cinzel',Georgia,serif; --bodyfont:'Cormorant Garamond',Georgia,serif;
+	--glow:none; --img-filter:grayscale(1) sepia(.35) contrast(1.08) brightness(.97);
+	--scanline-display:none; --corner-display:none; --radius:14px;
+	--h1-transform:none; --h1-tracking:normal; --flicker:none;
+	--bg-image:none;
+}
+body[data-skin="modern"]{
+	--bg:#f6f7f8; --ink:#14181a; --dim:#5c6468; --accent:#1f6feb; --accent2:#e8604c;
+	--display:'Inter',system-ui,sans-serif; --bodyfont:'Inter',system-ui,sans-serif;
+	--glow:none; --img-filter:none;
+	--scanline-display:none; --corner-display:none; --radius:10px;
+	--h1-transform:none; --h1-tracking:normal; --flicker:none;
+	--bg-image:none;
+}
+body[data-skin="noir"]{
+	--bg:#111113; --ink:#e9e9ea; --dim:#6b6b70; --accent:#c9c9d1; --accent2:#8f8f98;
+	--display:'Playfair Display',Georgia,serif; --bodyfont:'Inter',system-ui,sans-serif;
+	--glow:0 0 10px rgba(201,201,209,.25); --img-filter:grayscale(1) contrast(1.15) brightness(.92);
+	--scanline-display:none; --corner-display:none; --radius:4px;
+	--h1-transform:none; --h1-tracking:.01em; --flicker:none;
+	--bg-image:radial-gradient(ellipse at 50% -10%, rgba(255,255,255,.04), transparent 60%);
+}
+body[data-skin="synthwave"]{
+	--bg:#1a0b2e; --ink:#ffd9f3; --dim:#9a6fae; --accent:#ff2fb0; --accent2:#20d9fe;
+	--display:'Orbitron','JetBrains Mono',monospace; --bodyfont:'JetBrains Mono',monospace;
+	--glow:0 0 8px rgba(255,47,176,.6),0 0 20px rgba(32,217,254,.3);
+	--img-filter:grayscale(1) sepia(.5) hue-rotate(260deg) saturate(3) contrast(1.1) brightness(.85);
+	--scanline-display:block; --corner-display:block; --radius:2px;
+	--h1-transform:uppercase; --h1-tracking:.04em; --flicker:flicker 6s infinite;
+	--bg-image:linear-gradient(180deg, rgba(255,47,176,.12), transparent 40%),radial-gradient(ellipse at 50% 110%, rgba(32,217,254,.16), transparent 55%);
+}
+body[data-skin="cyberpunk"]{
+	--bg:#030504; --ink:#c9ffe6; --dim:#4f8a71; --accent:#00ff9c; --accent2:#ff2bd6;
+	--display:'Cyberpunk','JetBrains Mono',monospace; --bodyfont:'Share Tech Mono','JetBrains Mono',monospace;
+	--glow:0 0 6px rgba(0,255,156,.55),0 0 18px rgba(0,255,156,.25);
+	--img-filter:grayscale(1) sepia(.45) hue-rotate(60deg) saturate(2.6) contrast(1.12) brightness(.82);
+	--scanline-display:block; --corner-display:block; --radius:2px;
+	--h1-transform:uppercase; --h1-tracking:.03em; --flicker:flicker 6s infinite;
+	--bg-image:radial-gradient(ellipse at 50% -10%, rgba(0,255,156,.08), transparent 60%);
+}
+/* per-knot fine-tuning still wins over whichever skin is active */
+<% if knot.kolleg_bg %>body{--bg:<% knot.kolleg_bg %> !important;}<% end %>
+<% if knot.kolleg_ink %>body{--ink:<% knot.kolleg_ink %> !important;}<% end %>
+<% if knot.kolleg_dim %>body{--dim:<% knot.kolleg_dim %> !important;}<% end %>
+<% if knot.kolleg_accent %>body{--accent:<% knot.kolleg_accent %> !important;}<% end %>
+
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;}
+body{
+	overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--bodyfont);
+	background-image:var(--bg-image);
+	transition:background-color .3s ease,color .3s ease;
+}
+/* scanlines + faint flicker, pointer-events:none so it never blocks clicks */
+body::before{
+	content:"";position:fixed;inset:0;z-index:80;pointer-events:none;display:var(--scanline-display);
+	background:repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, color-mix(in srgb, var(--accent) 12%, transparent) 3px, rgba(0,0,0,0) 4px);
+	mix-blend-mode:overlay;
+}
+@keyframes flicker{0%,97%,100%{opacity:1;}98%{opacity:.86;}99%{opacity:.96;}}
+body{animation:var(--flicker);}
+
+#progress{position:fixed;top:0;left:0;right:0;height:3px;background:color-mix(in srgb, var(--accent) 8%, transparent);z-index:60;}
+#progress-fill{height:100%;width:0%;background:var(--accent);box-shadow:var(--glow);transition:width .4s ease;}
+
+.folio{
+	position:fixed;inset:0;
+	display:grid;grid-template-columns:clamp(220px,28vw,420px) 1fr;
+	gap:clamp(1.5rem,4vw,4rem);align-items:center;
+	padding:clamp(1.5rem,5vw,6rem);height:100dvh;height:100vh;
+	opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px);
+	transition:opacity .4s ease,transform .4s ease;
+}
+.folio.active{opacity:1;visibility:visible;pointer-events:auto;transform:none;}
+@media (max-width:760px){
+	.folio{grid-template-columns:1fr;grid-auto-rows:min-content;padding:1.25rem;gap:1rem;overflow-y:auto;align-content:start;align-items:start;padding-top:3rem;}
+	.engraving{max-height:34vh;margin-inline:auto;}
+}
+.folio-text{min-width:0;}
+.folio-text.solo{grid-column:1/-1;max-width:68ch;margin-inline:auto;}
+
+.folio h1{
+	font-family:var(--display);font-size:clamp(1.3rem,2.6vw,2.3rem);line-height:1.2;margin:0 0 clamp(.9rem,2.2vw,1.6rem);
+	text-transform:var(--h1-transform);letter-spacing:var(--h1-tracking);color:var(--ink);
+	text-shadow:var(--glow);
+}
+.folio h1 .rule{display:block;width:3.5rem;height:3px;background:var(--accent);box-shadow:0 0 8px var(--accent);margin-top:.7rem;}
+.kicker{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-top:.5rem;font-family:var(--bodyfont);}
+
+.folio-content{font-size:clamp(1rem,1.4vw,1.25rem);line-height:1.55;}
+.folio-content p{margin:0 0 1em;}
+.folio-content strong{color:var(--accent);font-weight:700;}
+.folio-content em{font-style:normal;color:var(--accent2);}
+.folio-content code{background:color-mix(in srgb, var(--accent) 10%, transparent);border:1px solid color-mix(in srgb, var(--accent) 30%, transparent);padding:.1em .4em;border-radius:3px;}
+.folio-content a{color:var(--accent);text-decoration:underline;text-decoration-color:color-mix(in srgb, var(--accent) 45%, transparent);}
+.folio-content .fragment{opacity:0;transform:translateY(5px);transition:opacity .3s ease,transform .3s ease;}
+.folio-content .fragment.shown{opacity:1;transform:none;}
+
+.engraving{position:relative;border:1px solid color-mix(in srgb, var(--accent) 40%, transparent);padding:8px;background:color-mix(in srgb, var(--accent) 4%, transparent);box-shadow:0 0 22px color-mix(in srgb, var(--accent) 12%, transparent) inset;border-radius:var(--radius);}
+.engraving::before,.engraving::after{content:"";position:absolute;width:14px;height:14px;border:2px solid var(--accent2);opacity:.85;display:var(--corner-display);}
+.engraving::before{top:-2px;left:-2px;border-right:0;border-bottom:0;}
+.engraving::after{bottom:-2px;right:-2px;border-left:0;border-top:0;}
+.engraving img{
+	display:block;width:100%;height:auto;aspect-ratio:3/4;object-fit:cover;border-radius:calc(var(--radius) * .6);
+	filter:var(--img-filter);
+}
+.engraving.raw img{filter:none;}
+.engraving figcaption{margin-top:.6rem;font-size:.7rem;color:var(--dim);text-align:center;letter-spacing:.03em;font-family:var(--bodyfont);}
+
+/* jump-to: thematic cross-links (predicate "echoes") surfaced per-slide */
+.echoes{margin-top:1.3rem;border-top:1px dashed color-mix(in srgb, var(--accent) 30%, transparent);padding-top:.8rem;}
+.echoes .echoes-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;color:var(--accent2);margin-bottom:.5rem;}
+.echoes ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.35rem;}
+.echoes a{
+	display:inline-flex;align-items:center;gap:.5rem;color:var(--ink);text-decoration:none;
+	font-size:.85rem;padding:.35rem .6rem;border:1px solid color-mix(in srgb, var(--accent) 25%, transparent);border-radius:calc(var(--radius) * .5);
+	background:color-mix(in srgb, var(--accent) 4%, transparent);transition:border-color .15s ease,background .15s ease;
+}
+.echoes a:hover{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 10%, transparent);}
+.echoes a .gl{color:var(--accent2);}
+
+/* Wikipedia-style hover preview card for an echo link -- positioned via JS
+   (position:fixed, computed from the link's own rect) rather than pure CSS
+   :hover placement, so it can't get clipped by any ancestor's overflow and
+   always clamps to stay fully on-screen regardless of where the echo sits
+   in the layout. */
+.echo-preview{
+	position:fixed;z-index:95;width:min(320px,80vw);display:flex;gap:.7rem;
+	padding:.7rem .8rem;border:1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+	border-radius:var(--radius);background:color-mix(in srgb, var(--bg) 92%, black 8%);
+	box-shadow:0 8px 28px rgba(0,0,0,.45);opacity:0;visibility:hidden;pointer-events:none;
+	transition:opacity .12s ease;
+}
+.echo-preview.show{opacity:1;visibility:visible;}
+.echo-preview img{width:68px;height:68px;flex:none;object-fit:cover;border-radius:calc(var(--radius) * .6);filter:var(--img-filter);}
+.echo-preview-body{min-width:0;}
+.echo-preview-body strong{display:block;font-family:var(--display);font-size:.84rem;line-height:1.25;color:var(--ink);margin-bottom:.3rem;}
+.echo-preview-body p{margin:0;font-size:.76rem;line-height:1.4;color:var(--dim);}
+
+#hud{position:fixed;top:0;left:0;right:0;z-index:70;padding:.8rem 1.1rem;font-size:.72rem;color:var(--dim);
+	display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;font-family:var(--bodyfont);}
+#hud a,#hud .gn-breadcrumb a{pointer-events:auto;}
+.gn-breadcrumb{position:static;max-width:60vw;white-space:normal;opacity:.9;color:var(--dim);font-size:.7rem;}
+.gn-breadcrumb a{color:var(--dim);}
+.gn-breadcrumb a:hover{color:var(--accent);}
+.gn-breadcrumb .gn-current{color:var(--ink);}
+.gn-altpaths{display:none;}
+#nav{position:fixed;bottom:1.3rem;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:1rem;z-index:70;font-size:.78rem;color:var(--dim);font-family:var(--bodyfont);}
+#nav button{background:color-mix(in srgb, var(--accent) 4%, transparent);border:1px solid color-mix(in srgb, var(--accent) 35%, transparent);color:var(--ink);width:2.2rem;height:2.2rem;border-radius:calc(var(--radius) * .5);cursor:pointer;font-size:1.05rem;line-height:1;opacity:.75;transition:opacity .2s ease,border-color .2s ease,box-shadow .2s ease;}
+#nav button:hover{opacity:1;border-color:var(--accent);box-shadow:0 0 10px color-mix(in srgb, var(--accent) 35%, transparent);}
+
+#toolbelt{position:fixed;top:.8rem;right:1.1rem;z-index:71;display:flex;align-items:center;gap:.5rem;font-family:var(--bodyfont);}
+.pill-btn{background:color-mix(in srgb, var(--accent) 5%, transparent);border:1px solid color-mix(in srgb, var(--accent) 35%, transparent);color:var(--ink);font-size:.7rem;padding:.3rem .6rem;border-radius:calc(var(--radius) * .5);cursor:pointer;}
+.pill-btn:hover{border-color:var(--accent);}
+#play-slider{width:120px;vertical-align:middle;}
+
+#skinbar{display:flex;gap:.35rem;align-items:center;margin-right:.3rem;padding-right:.5rem;border-right:1px solid color-mix(in srgb, var(--accent) 25%, transparent);}
+.skin-dot{width:1.05rem;height:1.05rem;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;opacity:.6;transition:opacity .15s ease,border-color .15s ease,transform .15s ease;}
+.skin-dot:hover{opacity:1;transform:scale(1.15);}
+.skin-dot.active{opacity:1;border-color:var(--ink);box-shadow:0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);}
+
+#brand{position:fixed;bottom:1.2rem;right:1.2rem;height:1.6rem;opacity:.5;z-index:70;filter:var(--img-filter);}
+
+/* live badge: shows cast connection + role, so a teacher can confirm the
+   broadcast is actually live, and a student can tell they're synced */
+#live-badge{display:flex;align-items:center;gap:.35rem;font-size:.68rem;color:var(--dim);padding:.3rem .55rem;border:1px solid color-mix(in srgb, var(--accent) 25%, transparent);border-radius:calc(var(--radius) * .5);}
+#live-badge .dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--dim);flex:none;}
+#live-badge.connected .dot{background:var(--accent);box-shadow:0 0 6px var(--accent);}
+#live-badge.teacher .dot{background:var(--accent2);box-shadow:0 0 6px var(--accent2);}
+
+/* click-to-enlarge modal for engraving images -- also what a teacher's cast
+   broadcasts to students, so viewports stay aligned on the same image */
+.engraving img{cursor:zoom-in;}
+#mf-modal{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;flex-direction:column;gap:1rem;padding:4vh 4vw;background:rgba(0,0,0,.92);}
+#mf-modal.show{display:flex;}
+#mf-modal img{max-width:min(90vw,1100px);max-height:78vh;object-fit:contain;border:1px solid var(--accent);box-shadow:0 0 40px color-mix(in srgb, var(--accent) 35%, transparent);border-radius:calc(var(--radius) * .6);filter:var(--img-filter);}
+#mf-modal img.raw{filter:none;}
+#mf-modal .mf-modal-caption{color:#ddd;font-size:.85rem;text-align:center;max-width:70ch;font-family:var(--bodyfont);}
+#mf-modal .mf-modal-close{position:fixed;top:1.2rem;right:1.5rem;font-size:2rem;line-height:1;color:#eee;cursor:pointer;background:none;border:0;}
+#mf-modal .mf-modal-close:hover{color:var(--accent);}
+
+.cover{grid-template-columns:none;text-align:center;justify-items:center;align-content:center;overflow-y:auto;}
+.cover h1{font-size:clamp(1.9rem,5vw,3.6rem);}
+.cover .rule{margin-inline:auto;}
+.cover .abstract{max-width:58ch;color:var(--dim);font-style:normal;font-size:clamp(.95rem,1.3vw,1.2rem);margin-bottom:2rem;}
+.cover .hint{margin-top:3rem;font-size:.72rem;color:var(--dim);opacity:.7;text-transform:uppercase;letter-spacing:.18em;}
+.cover .kicker{margin-top:.8rem;}
+/* QR + cover image sit side by side, not stacked -- two images stacked
+   vertically on top of title/abstract/hint was overflowing a normal
+   viewport's height on desktop (.folio has no scroll there), forcing the
+   title off-screen until the browser itself was zoomed out. Both are
+   height-capped relative to the viewport so neither can dominate. */
+.cover .cover-media{margin-top:1.6rem;display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:1.5rem;max-width:90vw;}
+.cover .qr-wrap{display:flex;flex-direction:column;align-items:center;gap:.5rem;}
+.cover .qr-box{background:#fff;padding:10px;border-radius:calc(var(--radius) * .6);width:120px;height:120px;border:1px solid color-mix(in srgb, var(--accent) 40%, transparent);box-shadow:0 0 18px color-mix(in srgb, var(--accent) 18%, transparent);}
+.cover .qr-box svg{display:block;width:100%;height:100%;}
+.cover .qr-caption{color:var(--dim);font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;}
+.cover .cover-engraving{margin:0;max-width:min(60vw,18rem);}
+.cover .cover-engraving img{max-height:min(32vh,16rem);max-width:100%;width:auto;height:auto;aspect-ratio:auto;object-fit:contain;}
+</style>
+<body data-skin="<% if knot.skin %><% knot.skin %><% else %>cyberpunk<% end %>">
+	<div id="progress"><div id="progress-fill"></div></div>
+
+	<div id="hud">
+		<% INCLUDE modules/graph_breadcrumb.tt %>
+	</div>
+
+	<div id="toolbelt">
+		<span id="live-badge" title="classroom cast"><span class="dot"></span><span id="live-badge-label">cast off</span></span>
+		<div id="skinbar">
+			<button class="skin-dot" data-skin="classical"  style="background:#a9802f" title="Classical"></button>
+			<button class="skin-dot" data-skin="modern"     style="background:#1f6feb" title="Modern"></button>
+			<button class="skin-dot" data-skin="noir"       style="background:#c9c9d1" title="Noir"></button>
+			<button class="skin-dot" data-skin="synthwave"  style="background:#ff2fb0" title="Synthwave"></button>
+			<button class="skin-dot" data-skin="cyberpunk"  style="background:#00ff9c" title="Cyberpunk"></button>
+		</div>
+		<% if login %>
+		<button id="rec-start" class="pill-btn" title="record this session">&#9679; rec</button>
+		<button id="rec-stop" class="pill-btn" hidden title="stop recording">&#9632; stop</button>
+		<% end %>
+		<% if knot.presentation_timeline and knot.ogg_url %>
+		<button id="play-start" class="pill-btn" title="play recorded session">&#9654; play</button>
+		<button id="play-pause" class="pill-btn" hidden title="pause">&#10074;&#10074;</button>
+		<input type="range" id="play-slider" min="0" max="100" value="0" disabled/>
+		<% end %>
+		<% if login == 'daniel-hromada' %>
+		<button id="audio-cast-start" class="pill-btn" title="broadcast microphone audio live, for students not in the room">&#127908; broadcast</button>
+		<button id="audio-cast-stop" class="pill-btn" hidden title="stop broadcasting audio">&#128263; stop audio</button>
+		<% else %>
+		<button id="audio-listen" class="pill-btn" hidden title="listen to the live broadcast">&#128266; listen</button>
+		<button id="audio-mute" class="pill-btn" hidden title="stop listening">&#128263; mute</button>
+		<% end %>
+		<audio id="mf-audio" hidden></audio>
+	</div>
+
+	<div id="deck">
+		<%# slide 0, before anything else, but ONLY for Klasse Leben's own
+		    decks (checked by materialized-path prefix) -- not a site-wide
+		    thing. See views/kolleg.tt for the sibling copy of this block.
+		    The knot_id is intentionally hardcoded -- this isn't "whatever
+		    this deck is about", it's one specific, unconditional moment. %>
+		<% show_mos = knot.knot_name.search('^baumhaus\.digital/Klasse Leben') %>
+		<% IF show_mos %>
+		<% mos_id = 4000 %>
+		<% mos = mos_id.get_plain_knot.first %>
+		<section class="folio active" data-index="0" id="folio-mos-<% mos.knot_id %>">
+			<div class="folio-text solo">
+				<h1><% mos.knot_name.short_name %><span class="rule"></span></h1>
+				<div class="folio-content"><% mos.knot_content %></div>
+			</div>
+		</section>
+		<% END %>
+
+		<% slides = knot.knot_id.get_full_deck %>
+
+		<section class="folio cover<% unless show_mos %> active<% end %>" data-index="<% if show_mos %>1<% else %>0<% end %>" id="folio-<% knot.knot_id %>">
+			<h1><% ancestors = knot.knot_name.split('/') %><% ancestors.last %><span class="rule"></span></h1>
+			<% if knot.epoch %><div class="kicker"><% knot.date %> &middot; <% knot.ae_epoch %></div><% end %>
+			<% if knot.knot_content %><div class="abstract"><% knot.knot_content.remove_html_tags %></div><% end %>
+			<%# a deck with children foliae gets the "scan to join" QR (classroom
+			    cast is per-deck, so the thing worth scanning for is THIS deck);
+			    the cover's own img_url, when set, shows the same as any other
+			    folio's engraving -- independent of whether there's also a QR,
+			    so a deck can have both its own cover image AND the join code. %>
+			<% if slides.size or knot.img_url %>
+			<div class="cover-media">
+				<% if slides.size %>
+				<div class="qr-wrap">
+					<div class="qr-box" id="mf-qr"></div>
+					<div class="qr-caption">scan to join on your phone</div>
+				</div>
+				<% end %>
+				<% if knot.img_url %>
+				<figure class="engraving<% if knot.raw_img %> raw<% end %> cover-engraving">
+					<img src="<% knot.img_url %>" alt="<% knot.img_legend %>" loading="lazy"/>
+					<% if knot.img_legend %><figcaption><% knot.img_legend %></figcaption><% end %>
+				</figure>
+				<% end %>
+			</div>
+			<% end %>
+			<div class="hint">&gt; click / swipe / arrow keys to begin_</div>
+		</section>
+
+		<% i = show_mos ? 1 : 0 %>
+		<% FOREACH slide IN slides %>
+			<% i = i + 1 %>
+			<section class="folio" data-index="<% i %>" id="folio-<% slide.knot_id %>">
+				<% has_media = slide.img_url or slide.youtube_url or slide.video_url %>
+				<% if slide.img_url %>
+					<figure class="engraving<% if slide.raw_img %> raw<% end %>">
+						<img src="<% slide.img_url %>" alt="<% slide.img_legend %>" loading="lazy"/>
+						<% if slide.img_legend %><figcaption><% slide.img_legend %></figcaption><% end %>
+					</figure>
+				<% elsif slide.youtube_url %>
+					<figure class="engraving media">
+						<iframe src="<% slide.youtube_url %>" loading="lazy" allowfullscreen></iframe>
+					</figure>
+				<% elsif slide.video_url %>
+					<figure class="engraving media">
+						<video src="<% slide.video_url %>" controls></video>
+					</figure>
+				<% end %>
+				<div class="folio-text<% unless has_media %> solo<% end %>">
+					<h1><% slide.knot_name.short_name %><span class="rule"></span></h1>
+					<% if slide.epoch %><div class="kicker"><% slide.date %> &middot; <% slide.ae_epoch %></div><% end %>
+					<div class="folio-content"><% slide.knot_content %></div>
+					<% echoes = slide.knot_id.get_echoes %>
+					<% if echoes.size %>
+					<div class="echoes">
+						<div class="echoes-label">&gt;&gt; cross-referenced signal</div>
+						<ul>
+						<% FOREACH e IN echoes %>
+							<li class="echo-item">
+								<a href="/<% e.knot_id %>.mainframe"><span class="gl">&#8644;</span> <% e.knot_name.short_name %></a>
+								<%# Wikipedia-style hover preview -- content is already fetched by
+								    get_echoes (same query joins knot_content + attributes), so this
+								    renders server-side with no extra request; echo-preview-hover.js
+								    (below) just positions/shows it on hover or focus. %>
+								<div class="echo-preview" role="tooltip">
+									<% if e.img_url %><img src="<% e.img_url %>" alt="" loading="lazy"/><% end %>
+									<div class="echo-preview-body">
+										<strong><% e.knot_name.short_name %></strong>
+										<% if e.knot_content %><p><% e.knot_content.remove_html_tags | truncate(180) %></p><% end %>
+									</div>
+								</div>
+							</li>
+						<% END %>
+						</ul>
+					</div>
+					<% end %>
+				</div>
+			</section>
+		<% END %>
+	</div>
+
+	<nav id="nav">
+		<button id="prev" aria-label="Previous">&#8249;</button>
+		<span id="counter"></span>
+		<button id="next" aria-label="Next">&#8250;</button>
+	</nav>
+
+	<img id="brand" src="<% if knot.logo %><% knot.logo %><% else %>/images/udk_logo.svg<% end %>" alt=""/>
+
+	<!-- click-to-enlarge, also the thing a teacher's cast puts on every
+	     student's screen when they click an image -->
+	<div id="mf-modal">
+		<button class="mf-modal-close" aria-label="Close">&times;</button>
+		<img id="mf-modal-img" alt=""/>
+		<div class="mf-modal-caption" id="mf-modal-caption"></div>
+	</div>
+
+<script src="/js/qrcode-generator.js"></script>
+<script>
+(function(){
+	// cover-slide QR: scan to open this exact deck -- paired with the
+	// classroom cast, so a student can scan, land here already synced to
+	// whatever the teacher is presenting.
+	var mfQr = document.getElementById('mf-qr');
+	if (mfQr) {
+		var qr = qrcode(0, 'M');
+		qr.addData(window.location.href);
+		qr.make();
+		mfQr.innerHTML = qr.createSvgTag(4, 0);
+	}
+
+	// skin: localStorage wins (so it survives jumping to an echoed knot
+	// elsewhere in the graph), falling back to this knot's own server-
+	// rendered default (data-skin, already set to avoid a flash). Whatever
+	// skin ends up active gets written back to localStorage, so even a
+	// first-ever visit "locks in" consistently for the rest of the session.
+	var SKIN_KEY = 'mainframe_skin';
+	var skinDots = Array.prototype.slice.call(document.querySelectorAll('.skin-dot'));
+	function applySkin(skin){
+		document.body.dataset.skin = skin;
+		try { localStorage.setItem(SKIN_KEY, skin); } catch (e) {}
+		skinDots.forEach(function(d){ d.classList.toggle('active', d.dataset.skin === skin); });
+	}
+	var storedSkin;
+	try { storedSkin = localStorage.getItem(SKIN_KEY); } catch (e) {}
+	applySkin(storedSkin || document.body.dataset.skin || 'cyberpunk');
+	skinDots.forEach(function(d){ d.addEventListener('click', function(){ applySkin(d.dataset.skin); }); });
+
+	/* Wikipedia-style hover preview for "cross-referenced signal" echo
+	   links -- content is already server-rendered inside .echo-preview
+	   (no fetch needed), this just positions it near the link with
+	   position:fixed (immune to any ancestor overflow/clipping) and shows
+	   it after a short delay so it doesn't flicker on fast mouse travel
+	   across several links. Keyboard focus shows/hides it too. */
+	(function(){
+		var SHOW_DELAY = 280;
+		var showTimer = null;
+		function clampToViewport(el, x, y){
+			var pad = 10;
+			var w = el.offsetWidth, h = el.offsetHeight;
+			if (x + w > window.innerWidth - pad) x = window.innerWidth - w - pad;
+			if (x < pad) x = pad;
+			if (y < pad) y = pad;
+			if (y + h > window.innerHeight - pad) y = window.innerHeight - h - pad;
+			el.style.left = x + 'px';
+			el.style.top = y + 'px';
+		}
+		function showPreview(item){
+			var preview = item.querySelector('.echo-preview');
+			var link = item.querySelector('a');
+			if (!preview || !link) return;
+			clearTimeout(showTimer);
+			showTimer = setTimeout(function(){
+				var r = link.getBoundingClientRect();
+				clampToViewport(preview, r.left, r.top - preview.offsetHeight - 8);
+				preview.classList.add('show');
+			}, SHOW_DELAY);
+		}
+		function hidePreview(item){
+			clearTimeout(showTimer);
+			var preview = item.querySelector('.echo-preview');
+			if (preview) preview.classList.remove('show');
+		}
+		Array.prototype.slice.call(document.querySelectorAll('.echo-item')).forEach(function(item){
+			item.addEventListener('mouseenter', function(){ showPreview(item); });
+			item.addEventListener('mouseleave', function(){ hidePreview(item); });
+			item.addEventListener('focusin', function(){ showPreview(item); });
+			item.addEventListener('focusout', function(){ hidePreview(item); });
+		});
+	})();
+
+	var folios = Array.prototype.slice.call(document.querySelectorAll('.folio'));
+	var total = folios.length;
+	var current = 0;
+	var presentation_timeline = [];
+	var recordingStartedAt = null;
+	var folioIndexById = {};
+	folios.forEach(function(f, idx){ if (f.id) folioIndexById[f.id] = idx; });
+
+	function fragmentsOf(folio){
+		return Array.prototype.slice.call(folio.querySelectorAll('.fragment'));
+	}
+
+	function logEvent(eventType, parameters){
+		if (!recordingStartedAt) return;
+		var folio = folios[current];
+		presentation_timeline.push({
+			eventType: eventType,
+			parameters: parameters,
+			timeElapsed: (new Date() - recordingStartedAt) / 1000,
+			folioId: folio ? folio.id : null,
+			source: 'mainframe'
+		});
+	}
+
+	function render(){
+		var pct = total > 1 ? (current / (total - 1) * 100) : 100;
+		document.getElementById('progress-fill').style.width = pct + '%';
+		var label = (current + 1) + ' / ' + total;
+		document.getElementById('counter').textContent = label;
+		history.replaceState(null, '', '#' + (current + 1));
+	}
+
+	function showFolio(i, allFragmentsShown, broadcast){
+		current = Math.max(0, Math.min(total - 1, i));
+		folios.forEach(function(f, idx){ f.classList.toggle('active', idx === current); });
+		fragmentsOf(folios[current]).forEach(function(f){
+			f.classList.toggle('shown', !!allFragmentsShown);
+		});
+		logEvent('slidechanged', {slide: current});
+		render();
+		if (broadcast !== false) broadcastSlideState();
+	}
+
+	function nextStep(broadcast){
+		var frags = fragmentsOf(folios[current]);
+		var hidden = frags.filter(function(f){ return !f.classList.contains('shown'); });
+		if (hidden.length){
+			var idx = frags.indexOf(hidden[0]);
+			hidden[0].classList.add('shown');
+			logEvent('fragmentshown', {slide: current, f: idx});
+			if (broadcast !== false) broadcastSlideState();
+			return;
+		}
+		if (current < total - 1){ showFolio(current + 1, false, broadcast); }
+	}
+	function prevStep(broadcast){
+		var frags = fragmentsOf(folios[current]);
+		var shown = frags.filter(function(f){ return f.classList.contains('shown'); });
+		if (shown.length){
+			var idx = frags.indexOf(shown[shown.length - 1]);
+			shown[shown.length - 1].classList.remove('shown');
+			logEvent('fragmenthidden', {slide: current, f: idx});
+			if (broadcast !== false) broadcastSlideState();
+			return;
+		}
+		if (current > 0){ showFolio(current - 1, true, broadcast); }
+	}
+
+	/* ------------------------------------------------------------------
+	   classroom cast: a teacher (login "daniel-hromada") broadcasts slide/
+	   fragment/modal state over the same relay this site has used since
+	   baumhaus.tt/sauen.tt -- a single global ws, teacher.py on :6789,
+	   proxied at /ws. It just relays whatever JSON the teacher sends to
+	   every connected "student" socket, no per-knot scoping (same as the
+	   original), so this intentionally mirrors that exact contract rather
+	   than inventing a new server-side protocol.
+	   Skin is NEVER part of the broadcast state -- each viewer's skin
+	   choice is personal and stays untouched no matter what the teacher
+	   or other students are seeing.
+	   ------------------------------------------------------------------ */
+	var isTeacher = <% if login == 'daniel-hromada' %>true<% else %>false<% end %>;
+	var liveBadge = document.getElementById('live-badge');
+	var liveBadgeLabel = document.getElementById('live-badge-label');
+	var socket = null;
+	var applyingRemote = false; // guards against echoing a remote update back out
+	var studentCount = null; // teacher only -- how many viewports are actually following along
+	var audioActive = false;  // is the teacher currently broadcasting mic audio right now
+
+	function setBadge(connected){
+		liveBadge.classList.toggle('connected', !!connected);
+		liveBadge.classList.toggle('teacher', isTeacher);
+		if (!connected){
+			liveBadgeLabel.textContent = 'cast off';
+		} else if (isTeacher){
+			liveBadgeLabel.textContent = 'casting · ' + (studentCount === null ? '?' : studentCount) + (studentCount === 1 ? ' student' : ' students') + (audioActive ? ' · 🎙' : '');
+		} else {
+			liveBadgeLabel.textContent = 'synced' + (audioActive ? ' · audio live' : '');
+		}
+	}
+
+	function connectCast(){
+		// teacher.py verifies a short-lived signed token (from
+		// /api/cast_token/, only issued to a real session logged in as
+		// daniel-hromada) instead of trusting the bare role=daniel-hromada
+		// string a client could otherwise just type into a URL.
+		if (isTeacher) {
+			$.get('/api/cast_token/', function(data){ openCastSocket(data && data.token); })
+				.fail(function(){ setBadge(false); setTimeout(connectCast, 4000); });
+		} else {
+			openCastSocket(null);
+		}
+	}
+
+	function openCastSocket(token){
+		var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+		var role = isTeacher ? 'daniel-hromada' : 'student';
+		var url = proto + '//' + location.host + '/ws?role=' + role;
+		if (token) url += '&token=' + encodeURIComponent(token);
+		try{
+			socket = new WebSocket(url);
+			socket.binaryType = 'arraybuffer'; // audio chunks arrive as binary frames, see below
+		} catch (e) { setBadge(false); return; }
+		socket.addEventListener('open', function(){ setBadge(true); });
+		socket.addEventListener('close', function(){ setBadge(false); setTimeout(connectCast, 4000); });
+		socket.addEventListener('error', function(){ setBadge(false); });
+		if (!isTeacher){
+			socket.addEventListener('message', function(event){
+				// binary frame (not JSON text) = a chunk of the teacher's live
+				// mic audio -- see startListening() below
+				if (typeof event.data !== 'string'){
+					feedAudioChunk(event.data);
+					return;
+				}
+				var state;
+				try { state = JSON.parse(event.data); } catch (e) { return; }
+				applyingRemote = true;
+				if (state.type === 'slide'){
+					if (typeof state.index === 'number') showFolio(state.index, false, false);
+					if (typeof state.shown === 'number'){
+						fragmentsOf(folios[current]).forEach(function(f, idx){ f.classList.toggle('shown', idx < state.shown); });
+					}
+				} else if (state.type === 'modal'){
+					if (state.open) openModal(state.src, state.caption, state.raw, false);
+					else closeModal(false);
+				} else if (state.type === 'audio'){
+					audioActive = !!state.active;
+					updateAudioButtons();
+					setBadge(true);
+					if (!audioActive) stopListening();
+				}
+				applyingRemote = false;
+			});
+		} else {
+			// the relay also pushes a student headcount to teacher sockets
+			// (join/leave), separate from whatever the teacher itself casts
+			socket.addEventListener('message', function(event){
+				var state;
+				try { state = JSON.parse(event.data); } catch (e) { return; }
+				if (state.type === 'student_count'){
+					var joined = studentCount !== null && state.count > studentCount;
+					studentCount = state.count;
+					setBadge(true);
+					// a late joiner needs a fresh WebM init segment to make
+					// sense of any audio chunk, which only the very first
+					// chunk after (re)starting the recorder carries -- so
+					// restart it on every new arrival while broadcasting.
+					// Costs already-listening students one short (<1s) gap.
+					if (joined && audioActive) restartAudioBroadcast();
+				}
+			});
+		}
+	}
+
+	function castSend(state){
+		if (!isTeacher || applyingRemote) return;
+		if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(state));
+	}
+
+	function broadcastSlideState(){
+		var shown = fragmentsOf(folios[current]).filter(function(f){ return f.classList.contains('shown'); }).length;
+		castSend({type: 'slide', index: current, shown: shown});
+	}
+
+	connectCast();
+
+	/* ------------------------------------------------------------------
+	   live mic audio, for students who aren't physically in the room --
+	   reuses the exact same cast socket as the slide sync: JSON text
+	   frames carry state (as above), raw binary frames carry MediaRecorder
+	   output chunks. teacher.py doesn't care either way, it already just
+	   relays whatever bytes it receives to every connected student.
+	   ------------------------------------------------------------------ */
+	var AUDIO_MIME = 'audio/webm;codecs=opus';
+	var audioRecorder = null, audioStream = null;
+	// Safari (and jsdom, and anything else without MSE/opus support) can't
+	// do this -- feature-detect up front so a click fails gracefully with a
+	// clear message instead of throwing deep inside a promise callback.
+	var audioSupported = (typeof MediaSource !== 'undefined') && typeof MediaSource.isTypeSupported === 'function' &&
+		MediaSource.isTypeSupported(AUDIO_MIME) && typeof MediaRecorder !== 'undefined' &&
+		(!MediaRecorder.isTypeSupported || MediaRecorder.isTypeSupported(AUDIO_MIME));
+	if (!audioSupported){
+		<% if login == 'daniel-hromada' %>
+		var bcastBtn = document.getElementById('audio-cast-start');
+		if (bcastBtn){ bcastBtn.disabled = true; bcastBtn.title = "this browser doesn't support live audio broadcast (needs MediaRecorder + MediaSource/Opus -- try Chrome or Firefox)"; }
+		<% else %>
+		var listenBtn = document.getElementById('audio-listen');
+		if (listenBtn){ listenBtn.title = "this browser doesn't support live audio playback (needs MediaSource/Opus -- try Chrome or Firefox)"; }
+		<% end %>
+	}
+
+	function startAudioBroadcast(){
+		if (!isTeacher || audioRecorder || !audioSupported) return;
+		navigator.mediaDevices.getUserMedia({audio: true}).then(function(stream){
+			audioStream = stream;
+			audioRecorder = new MediaRecorder(stream, {mimeType: AUDIO_MIME});
+			audioRecorder.ondataavailable = function(e){
+				if (e.data && e.data.size > 0 && socket && socket.readyState === WebSocket.OPEN){
+					e.data.arrayBuffer().then(function(buf){ socket.send(buf); });
+				}
+			};
+			audioRecorder.start(250); // 250ms chunks: low latency, still cheap
+			audioActive = true;
+			castSend({type: 'audio', active: true});
+			updateAudioButtons();
+			setBadge(true);
+		}).catch(function(err){ console.error('mainframe: microphone unavailable', err); });
+	}
+	function stopAudioBroadcast(announce){
+		if (audioRecorder){ audioRecorder.stop(); audioRecorder = null; }
+		if (audioStream){ audioStream.getTracks().forEach(function(t){ t.stop(); }); audioStream = null; }
+		audioActive = false;
+		if (announce !== false) castSend({type: 'audio', active: false});
+		updateAudioButtons();
+		setBadge(true);
+	}
+	function restartAudioBroadcast(){
+		if (!audioRecorder) return;
+		stopAudioBroadcast(false);
+		setTimeout(startAudioBroadcast, 150);
+	}
+
+	var mediaSource = null, audioSourceBuffer = null, pendingAudioChunks = [], listening = false;
+	var mfAudioEl = document.getElementById('mf-audio');
+	function appendNextAudioChunk(){
+		if (!audioSourceBuffer || audioSourceBuffer.updating || !pendingAudioChunks.length) return;
+		try { audioSourceBuffer.appendBuffer(pendingAudioChunks.shift()); } catch (e) { /* chunk from before a restart; drop it */ }
+	}
+	function feedAudioChunk(buf){
+		if (!listening) return;
+		pendingAudioChunks.push(buf);
+		appendNextAudioChunk();
+	}
+	function startListening(){
+		if (isTeacher || listening || !audioActive || !audioSupported) return;
+		listening = true;
+		pendingAudioChunks = [];
+		mediaSource = new MediaSource();
+		mfAudioEl.src = URL.createObjectURL(mediaSource);
+		mfAudioEl.hidden = false;
+		mediaSource.addEventListener('sourceopen', function(){
+			audioSourceBuffer = mediaSource.addSourceBuffer(AUDIO_MIME);
+			audioSourceBuffer.addEventListener('updateend', appendNextAudioChunk);
+		});
+		mfAudioEl.play().catch(function(){});
+		updateAudioButtons();
+	}
+	function stopListening(){
+		listening = false;
+		pendingAudioChunks = [];
+		mfAudioEl.pause();
+		mfAudioEl.removeAttribute('src');
+		mfAudioEl.hidden = true;
+		mediaSource = null; audioSourceBuffer = null;
+		updateAudioButtons();
+	}
+
+	function updateAudioButtons(){
+		if (isTeacher){
+			var s = document.getElementById('audio-cast-start'), x = document.getElementById('audio-cast-stop');
+			if (s) s.hidden = audioActive;
+			if (x) x.hidden = !audioActive;
+		} else {
+			var l = document.getElementById('audio-listen'), m = document.getElementById('audio-mute');
+			if (l) l.hidden = !audioActive || listening;
+			if (m) m.hidden = !listening;
+		}
+	}
+	<% if login == 'daniel-hromada' %>
+	document.getElementById('audio-cast-start').addEventListener('click', startAudioBroadcast);
+	document.getElementById('audio-cast-stop').addEventListener('click', function(){ stopAudioBroadcast(true); });
+	<% else %>
+	document.getElementById('audio-listen').addEventListener('click', startListening);
+	document.getElementById('audio-mute').addEventListener('click', stopListening);
+	<% end %>
+
+	// click-to-enlarge image modal -- a teacher opening/closing it casts
+	// the same open/close to every student
+	var mfModal = document.getElementById('mf-modal');
+	var mfModalImg = document.getElementById('mf-modal-img');
+	var mfModalCaption = document.getElementById('mf-modal-caption');
+	function openModal(src, caption, raw, broadcast){
+		mfModal.classList.add('show');
+		mfModalImg.src = src;
+		mfModalImg.classList.toggle('raw', !!raw);
+		mfModalCaption.textContent = caption || '';
+		if (broadcast !== false) castSend({type: 'modal', open: true, src: src, caption: caption || '', raw: !!raw});
+	}
+	function closeModal(broadcast){
+		mfModal.classList.remove('show');
+		if (broadcast !== false) castSend({type: 'modal', open: false});
+	}
+	document.querySelectorAll('.engraving img').forEach(function(img){
+		img.addEventListener('click', function(){
+			openModal(img.getAttribute('src'), img.getAttribute('alt'), img.closest('.engraving').classList.contains('raw'), true);
+		});
+	});
+	mfModal.querySelector('.mf-modal-close').addEventListener('click', function(){ closeModal(true); });
+	mfModal.addEventListener('click', function(e){ if (e.target === mfModal) closeModal(true); });
+	document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && mfModal.classList.contains('show')) closeModal(true); });
+
+	document.getElementById('next').addEventListener('click', nextStep);
+	document.getElementById('prev').addEventListener('click', prevStep);
+
+	document.addEventListener('keydown', function(e){
+		if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' '){ nextStep(); e.preventDefault(); }
+		else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || e.key === 'Backspace'){ prevStep(); e.preventDefault(); }
+		else if (e.key === 'Home'){ showFolio(0, false); }
+		else if (e.key === 'End'){ showFolio(total - 1, true); }
+	});
+
+	document.getElementById('deck').addEventListener('click', function(e){
+		if (e.target.closest('a,button,#toolbelt')) return;
+		var x = e.clientX / window.innerWidth;
+		if (x < 0.35) prevStep(); else nextStep();
+	});
+
+	var touchX = null;
+	document.addEventListener('touchstart', function(e){ touchX = e.changedTouches[0].clientX; }, {passive:true});
+	document.addEventListener('touchend', function(e){
+		if (touchX === null) return;
+		var dx = e.changedTouches[0].clientX - touchX;
+		if (Math.abs(dx) > 50){ dx < 0 ? nextStep() : prevStep(); }
+		touchX = null;
+	}, {passive:true});
+
+	<% if login %>
+	var recorder, recordingChunks = [];
+	var recStart = document.getElementById('rec-start');
+	var recStop = document.getElementById('rec-stop');
+	recStart.addEventListener('click', function(){
+		navigator.mediaDevices.getUserMedia({audio: true}).then(function(stream){
+			recorder = new MediaRecorder(stream);
+			recordingChunks = [];
+			recorder.ondataavailable = function(e){ if (e.data && e.data.size > 0) recordingChunks.push(e.data); };
+			recorder.start(1000);
+			recordingStartedAt = new Date();
+			presentation_timeline = [];
+			recStart.hidden = true;
+			recStop.hidden = false;
+		}).catch(function(err){ console.error('mainframe: microphone unavailable', err); });
+	});
+	recStop.addEventListener('click', function(){
+		recorder.stop();
+		var blob = new Blob(recordingChunks, {type: 'audio/webm'});
+		var fd = new FormData();
+		fd.append('audio_data', blob);
+		fd.append('knot_name', "<% knot.knot_name %>");
+		fd.append('presentation_id', <% knot.knot_id %>);
+		fd.append('duration', (new Date() - recordingStartedAt) / 1000);
+		fd.append('presentation_timeline', JSON.stringify(presentation_timeline));
+		fetch('/new_audio_knot', {method: 'POST', body: fd});
+		recStop.hidden = true;
+		recStart.hidden = false;
+		recordingStartedAt = null;
+	});
+	<% end %>
+
+	<% if knot.presentation_timeline and knot.ogg_url %>
+	var timeline = <% knot.presentation_timeline %>;
+	var audioFile = "<% knot.ogg_url %>";
+	var audio, currentEventIndex = 0, isPaused = false, sliderLock = false;
+	var playStart = document.getElementById('play-start');
+	var playPause = document.getElementById('play-pause');
+	var playSlider = document.getElementById('play-slider');
+
+	function handlePlaybackEvent(ev){
+		var targetIdx = ev.folioId ? folioIndexById[ev.folioId] : undefined;
+		if (typeof targetIdx === 'number' && targetIdx !== current){ showFolio(targetIdx, false); }
+		var p = ev.parameters || {};
+		if (typeof p.f === 'number' && typeof targetIdx === 'number'){
+			var upto = ev.eventType === 'fragmenthidden' ? p.f : p.f + 1;
+			fragmentsOf(folios[targetIdx]).forEach(function(fr, idx){ fr.classList.toggle('shown', idx < upto); });
+		}
+	}
+
+	playStart.addEventListener('click', function(){
+		if (!audio){
+			audio = new Audio(audioFile);
+			audio.addEventListener('loadedmetadata', function(){
+				playSlider.max = Math.floor(audio.duration);
+				playSlider.disabled = false;
+			});
+			audio.play();
+			isPaused = false;
+			playStart.hidden = true;
+			playPause.hidden = false;
+			audio.ontimeupdate = function(){
+				if (!sliderLock) playSlider.value = Math.floor(audio.currentTime);
+				if (!isPaused){
+					while (currentEventIndex < timeline.length && audio.currentTime >= timeline[currentEventIndex].timeElapsed){
+						handlePlaybackEvent(timeline[currentEventIndex]);
+						currentEventIndex++;
+					}
+				}
+			};
+			audio.onended = function(){ playStart.hidden = false; playPause.hidden = true; currentEventIndex = 0; };
+		} else if (isPaused){
+			audio.play();
+			isPaused = false;
+			playStart.hidden = true;
+			playPause.hidden = false;
+		}
+	});
+	playPause.addEventListener('click', function(){
+		if (audio && !isPaused){
+			audio.pause();
+			isPaused = true;
+			playStart.hidden = false;
+			playPause.hidden = true;
+		}
+	});
+	playSlider.addEventListener('input', function(e){
+		var t = parseFloat(e.target.value);
+		if (!audio) return;
+		sliderLock = true;
+		audio.currentTime = t;
+		currentEventIndex = timeline.findIndex(function(ev){ return ev.timeElapsed > t; });
+		if (currentEventIndex < 0) currentEventIndex = timeline.length;
+		if (currentEventIndex > 0) currentEventIndex--;
+		if (timeline[currentEventIndex]) handlePlaybackEvent(timeline[currentEventIndex]);
+		sliderLock = false;
+	});
+	<% end %>
+
+	var hashVal = parseInt((location.hash || '').replace('#',''), 10);
+	var hasHash = !isNaN(hashVal) && hashVal >= 1;
+	showFolio(hasHash ? hashVal - 1 : 0, hasHash);
+})();
+</script>
+</body>
+</html>

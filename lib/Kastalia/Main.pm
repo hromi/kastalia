@@ -16,6 +16,27 @@ require Kastalia::API;
 require BDLP::Main;
 
 use Pg::hstore qw/hstore_encode hstore_decode/;
+use Cache::Memcached;
+
+# Basic brute-force throttle for /login and /api/auth/, the two routes that
+# check a credential -- neither had any rate limiting at all. Reuses the
+# memcached instance already running for sessions (127.0.0.1:11211) rather
+# than adding a new dependency. Keyed on the real client IP (nginx's
+# common_server.conf sets X-Real-IP on every request that reaches this app;
+# request->address would just be the unix-socket-local address and is
+# useless here).
+my $_rate_memd = Cache::Memcached->new({servers => ['127.0.0.1:11211']});
+sub client_ip { return request->header('X-Real-IP') || request->address || 'unknown'; }
+sub rate_limited {
+	my ($bucket, $limit, $window_seconds) = @_;
+	my $key = "ratelimit:$bucket";
+	my $count = $_rate_memd->incr($key);
+	if (!defined $count) {
+		$_rate_memd->add($key, 0, $window_seconds);
+		$count = $_rate_memd->incr($key) || 1;
+	}
+	return $count > $limit;
+}
 #JSON::XS (OO interface only -- JSON::XS->new->...) is already loaded via
 #Kastalia::TT's `use JSON::XS;` above; a second `use JSON::XS;` here would
 #just re-import encode_json/decode_json and trigger prototype warnings.
@@ -82,7 +103,35 @@ get =>  qr{/portfolio/(\w+)} => sub {
 
 hook before => sub {
 	#debug "REQPATH ".request->path;
-	
+
+	# Lightweight CSRF defense: this app has no per-form CSRF tokens, so
+	# without this, a malicious page anywhere on the web could drive a
+	# logged-in visitor's browser into silently POSTing to any of this
+	# app's many mutating routes (add/delete bounds, update attributes,
+	# etc.) -- the browser sends the victim's real session cookie along
+	# automatically. Modern browsers always set an Origin header on a
+	# cross-site POST, even a plain <form> submit, so reject any POST
+	# whose Origin isn't one of this app's own configured domains. Fails
+	# OPEN when Origin is absent (some legitimate same-origin or non-
+	# browser requests don't send one) -- this blocks the actual cross-
+	# site attack vector without risking same-origin requests that
+	# happen not to set it. Not a complete CSRF fix (that's per-form
+	# tokens, a larger change touching every POST route/template); this
+	# closes the gap for the realistic browser-based attack.
+	if (request->method eq 'POST') {
+		my $origin = request->header('Origin');
+		if ($origin) {
+			(my $origin_host = $origin) =~ s{^https?://}{}i;
+			$origin_host =~ s{:\d+$}{};
+			if (!exists config->{'host'}->{$origin_host}) {
+				debug "SECWARN CSRF: rejected POST to ".request->path." with foreign Origin $origin";
+				status 403;
+				halt('Forbidden: cross-origin request blocked.');
+				return;
+			}
+		}
+	}
+
 	if (config->{'host'}->{request->host}) {
 		$root_knot=config->{'host'}->{request->host};
 	} else {
@@ -157,10 +206,21 @@ get qr{/audio/(\d+)\.(ogg|mp3)} => sub {
 			#debug("EXISTS sending $id");
 			send_file "$id";
 		} elsif ($ogg_file=~/^http/) {
-			debug("downloadin $ogg_file to $ogg_new");
-			`curl -k $ogg_file -o $ogg_new`;
-			debug("HTTP sending $id.ogg");
-		        send_file "$id";	
+			# ogg_url is an ordinary knot attribute any logged-in user can
+			# set via /api/update_attribute/ -- unquoted, it was command
+			# injection; unvalidated, the server would fetch *any* URL an
+			# attacker chose, including internal/metadata addresses (SSRF).
+			if (!is_safe_outbound_url($ogg_file)) {
+				debug "SECWARN /audio/$id.ogg refused unsafe ogg_url: $ogg_file";
+			} else {
+				debug("downloadin $ogg_file to $ogg_new");
+				use String::ShellQuote;
+				my $ogg_file_quoted = shell_quote $ogg_file;
+				my $ogg_new_quoted = shell_quote $ogg_new;
+				`curl -ks $ogg_file_quoted -o $ogg_new_quoted`;
+				debug("HTTP sending $id.ogg");
+				send_file "$id";
+			}
 		}
 	} elsif ($type eq "mp3") {
 		my $mp3_file=$ogg_file;
@@ -168,12 +228,18 @@ get qr{/audio/(\d+)\.(ogg|mp3)} => sub {
 		my $mp3_full=PUBLIC_DIR."data".$mp3_file;
 		if (! -f PUBLIC_DIR."data".$mp3_file) {
 			my $ogg_full=PUBLIC_DIR."data".$ogg_file;
+			# ogg_file (and so ogg_full/mp3_full) traces back to the
+			# attacker-settable ogg_url attribute -- quote before it
+			# reaches a shell.
+			use String::ShellQuote;
+			my $ogg_full_quoted = shell_quote $ogg_full;
+			my $mp3_full_quoted = shell_quote $mp3_full;
 			if ( -f $ogg_full) {
-				`ffmpeg -i $ogg_full -acodec libmp3lame $mp3_full`;
+				`ffmpeg -i $ogg_full_quoted -acodec libmp3lame $mp3_full_quoted`;
 				send_file $mp3_file;
 			} 
 			if ( -f $ogg_full) {
-				`ffmpeg -i $ogg_full -acodec libmp3lame $mp3_full`;
+				`ffmpeg -i $ogg_full_quoted -acodec libmp3lame $mp3_full_quoted`;
 				send_file $mp3_file;
 			} 
 		} else {
@@ -202,6 +268,11 @@ get '/image/*' => sub {
 
 
 post qr{/new_audio_knot/?} => sub {
+	if (!session('login')) {
+		debug "SECWARN Non-logged in user called /new_audio_knot/.";
+		rdrct((session 'last_get_path'),"Permission denied. Administrator guild has been notified.");
+		return;
+	}
 	my $file = request->upload('audio_data');
 	debug $file;
 	my %h;
@@ -255,8 +326,19 @@ post qr{/new_audio_knot/?} => sub {
 	}
 	$wav=$wav."$token-$parent_id-$basename.wav";
 	
-	if ($file->{'headers'}->{'Content-Type'}=='audio/webm') {
-		`ffmpeg -i $file->{'tempname'} -vn -acodec pcm_s16le -ar 44100 -ac 2 $wav`;
+	if ($file->{'headers'}->{'Content-Type'} eq 'audio/webm') {
+		# was `==` (numeric), which numifies both sides to 0 -- always
+		# true regardless of actual content type, so this branch (and its
+		# unquoted shell interpolation below) ran on every upload. Also
+		# quote both paths before they ever reach a shell: $wav is built
+		# from several raw user params (voice_id/age/gender/motherlang/
+		# zodiac/consent, and the uploaded filename itself), so an
+		# unquoted value here was unauthenticated-adjacent RCE the moment
+		# any of those fields contained shell metacharacters.
+		use String::ShellQuote;
+		my $tempname_quoted = shell_quote $file->{'tempname'};
+		my $wav_quoted = shell_quote $wav;
+		`ffmpeg -i $tempname_quoted -vn -acodec pcm_s16le -ar 44100 -ac 2 $wav_quoted`;
 		$file_dest=$wav;
 	}
 	else {
@@ -391,14 +473,30 @@ any ['get', 'post'] => qr{/logout/?} => sub {
 
 post qr{/login/?} => sub {
 	#debug "Logging in";
+	if (rate_limited('login:'.client_ip(), 10, 60)) {
+		debug "SECWARN rate-limited /login from ".client_ip();
+		forward '/login', {err=>"Too many attempts. Please wait a minute and try again."},{ method => 'GET' };
+		return;
+	}
 	use Net::LDAP;
-	my $ldap = Net::LDAP->new(config->{ldap_host})  or  die "$@";
 	my $l=params->{login};
 	$l=~s/^ +//g;
 	$l=~s/ +$//g;
-	my $mesg = $ldap->bind("cn=$l,".config->{ldap_ou1}.",".config->{ldap_base},password => params->{pwd});
+	my $pwd = params->{pwd};
+	# RFC 4513 5.1.2: an LDAP bind with a non-empty DN and a ZERO-LENGTH
+	# password is a defined "unauthenticated bind" -- depending on the
+	# server's own config, that can succeed with no credential check at
+	# all. Never let an empty password reach bind(); fail the same way a
+	# wrong password would.
+	if (!defined($l) || $l eq '' || !defined($pwd) || $pwd eq '') {
+		my $err="Authentication failed.";
+		forward '/login', {err=>$err},{ method => 'GET' };
+		return;
+	}
+	my $ldap = Net::LDAP->new(config->{ldap_host})  or  die "$@";
+	my $mesg = $ldap->bind("cn=$l,".config->{ldap_ou1}.",".config->{ldap_base},password => $pwd);
 	if ($mesg->code!=0) {
-		my $mesg = $ldap->bind("cn=$l,".config->{ldap_ou2}.",".config->{ldap_base},password => params->{pwd});
+		my $mesg = $ldap->bind("cn=$l,".config->{ldap_ou2}.",".config->{ldap_base},password => $pwd);
 		if ($mesg->code!=0) {
 			my $err="Authentication failed.";
 			forward '/login', {err=>$err},{ method => 'GET' };
@@ -825,19 +923,32 @@ post qr {/bookmark/?} => sub {
 };
 
 post qr {/ocr_img/?} => sub {
+	if (!session('login')) {
+		debug "SECWARN Non-logged in user called /ocr_img/.";
+		rdrct((session 'last_get_path'),"Permission denied. Administrator guild has been notified.");
+		return;
+	}
 	my $knot_id = param "knot_id";
 	my $user_id = session('user_id');
 	my $knot = get_knot($knot_id);
 	my $img_file = PUBLIC_DIR.$knot->{'img_url'};
 	debug $img_file;
 
-	my $img_desc=`identify $img_file`;
+	# img_url is an attacker-settable knot attribute (any logged-in user
+	# can set it via /api/update_attribute/) -- it was interpolated
+	# unquoted into two shell commands below, so a malicious img_url value
+	# was command injection reachable by anyone who could trigger this
+	# route against that knot.
+	use String::ShellQuote;
+	my $img_file_quoted = shell_quote $img_file;
+
+	my $img_desc=`identify $img_file_quoted`;
 	$img_desc=~/ (\d+)x(\d+) /;
 	my $img_width=$1;
 	my $img_height=$2;
 	print "$img_width $img_height";
 
-	my $tsv=`tesseract $img_file stdout -l deu tsv`;
+	my $tsv=`tesseract $img_file_quoted stdout -l deu tsv`;
 	use Text::CSV qw(csv);
 	debug $tsv;
 	my $aoh = csv (in => \$tsv, headers => "auto",  sep_char=> "\t", escape_char => "\\" );
@@ -859,14 +970,23 @@ post qr {/ocr_img/?} => sub {
 
 
 post qr {/speech_segment/?} => sub {
+	if (!session('login')) {
+		debug "SECWARN Non-logged in user called /speech_segment/.";
+		rdrct((session 'last_get_path'),"Permission denied. Administrator guild has been notified.");
+		return;
+	}
 	my $knot_id = param "knot_id";
 	my $user_id = session('user_id');
 	my $knot = get_knot($knot_id);
 	use String::ShellQuote;
 	my $speech_file = shell_quote PUBLIC_DIR.$knot->{'speech_url'};
-	my $cmd=UTILS_DIR."/segment_audio.py -i $speech_file --host ".config->{mikroserver_host}." -v ".session('login');
-	$cmd.=" -s ".$knot->{'scorer'} if $knot->{'scorer'};
-	$cmd.=" -l ".$knot->{'lang'} if $knot->{'lang'};
+	# host is trusted static config, but login/scorer/lang all end up in
+	# this shell command too -- scorer/lang are ordinary knot attributes
+	# any logged-in user can set via /api/update_attribute/, so quote
+	# everything rather than trying to judge which ones "need" it.
+	my $cmd=UTILS_DIR."/segment_audio.py -i $speech_file --host ".shell_quote(config->{mikroserver_host})." -v ".shell_quote(session('login'));
+	$cmd.=" -s ".shell_quote($knot->{'scorer'}) if $knot->{'scorer'};
+	$cmd.=" -l ".shell_quote($knot->{'lang'}) if $knot->{'lang'};
 	debug($cmd);
 	my @transcriptions=`$cmd`;
 	my $segment_id=0;
@@ -888,6 +1008,11 @@ post qr {/speech_segment/?} => sub {
 };
 
 post qr {/split/?} => sub {
+	if (!session('login')) {
+		debug "SECWARN Non-logged in user called /split/.";
+		rdrct((session 'last_get_path'),"Permission denied. Administrator guild has been notified.");
+		return;
+	}
 	#debug 'SPLITSPLIT';
 	my $knot_id = param "knot_id";
 	my $user_id = session('user_id');
@@ -922,11 +1047,29 @@ get qr {^/(\d+)([/.]\w+)?/?$} => sub {
 
 get qr {^/wiki/(.*)$} => sub {
 	(my $article)=splat;
+	if (!session('login')) {
+		debug "SECWARN Non-logged in user called /wiki/ for $article.";
+		rdrct((session 'last_get_path'),"Permission denied. Administrator guild has been notified.");
+		return;
+	}
+	# $article used to be interpolated straight into a backtick shell string
+	# AND into two filesystem paths -- a single quote (or any other shell
+	# metacharacter) in the URL was a full, unauthenticated remote command
+	# execution (e.g. GET /wiki/x'; touch pwned; echo '). Allowlist real
+	# wiki-title characters only (no slashes, no shell metacharacters), and
+	# pass wget as an argv list (system(LIST) never goes through a shell at
+	# all) as defense in depth even if the allowlist had a gap.
+	if ($article !~ /^[\w.:,()-]+$/u) {
+		debug "SECWARN /wiki/ rejected unsafe article name: $article";
+		status 400;
+		return "Invalid article name.";
+	}
 	debug "URL $article";
 	my $url="de.wikipedia.org/wiki/$article" if $article!~/wikipedia\.org/;
-	`wget -P ./public/wiki/ -rEDpkH -l2 --span-hosts --domains=de.wikipedia.org,en.wikipedia.org,upload.wikimedia.org,wikimedia.org '$url'`;
-	open(IN, "< ./public/wiki/$url.html") or die $!;
-	open(OUT, "> ./public/wiki/$url") or die $!;
+	system('wget','-P','./public/wiki/','-rEDpkH','-l2','--span-hosts',
+		'--domains=de.wikipedia.org,en.wikipedia.org,upload.wikimedia.org,wikimedia.org',$url);
+	open(IN, "<", "./public/wiki/$url.html") or die $!;
+	open(OUT, ">", "./public/wiki/$url") or die $!;
 	while(<IN>) {
     		$_ =~ s/rel="stylesheet" href="\/w\/load.php\?.*"/rel="stylesheet" href="\/w\/load.css"/g;
     		$_ =~ s/src="\/w\/load.php\?.*"/rel="stylesheet" href="\/w\/load.js"/g;
@@ -1117,6 +1260,11 @@ post qr {/create_bound/?} => sub {
 	rdrct((session 'last_get_path'),"Bound created.");
 };	
 post qr {/insert/?} => sub {
+	if (!session('login')) {
+		debug "SECWARN Non-logged in user called /insert/.";
+		rdrct((session 'last_get_path'),"Permission denied. Administrator guild has been notified.");
+		return;
+	}
 	my $parent_id = param "parent_id";
 	my $knot_name=param "name";
 	my $predicate=param "predicate";

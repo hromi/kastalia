@@ -88,7 +88,24 @@ body{overflow:hidden;}
 	</div>
 
 	<div id="deck">
-		<section class="folio cover" data-index="0" id="folio-<% knot.knot_id %>">
+		<%# slide 0, before anything else, but ONLY for Klasse Leben's own
+		    decks (checked by materialized-path prefix) -- not a site-wide
+		    thing. See views/mainframe.tt for the sibling copy of this
+		    block. The knot_id is intentionally hardcoded -- this isn't
+		    "whatever this deck is about", it's one specific moment. %>
+		<% show_mos = knot.knot_name.search('^baumhaus\.digital/Klasse Leben') %>
+		<% IF show_mos %>
+		<% mos_id = 4000 %>
+		<% mos = mos_id.get_plain_knot.first %>
+		<section class="folio" data-index="0" id="folio-mos-<% mos.knot_id %>">
+			<div class="folio-text solo">
+				<h1><% mos.knot_name.short_name %><span class="rule"></span></h1>
+				<div class="folio-content"><% mos.knot_content %></div>
+			</div>
+		</section>
+		<% END %>
+
+		<section class="folio cover" data-index="<% if show_mos %>1<% else %>0<% end %>" id="folio-<% knot.knot_id %>">
 			<h1><% ancestors = knot.knot_name.split('/') %><% ancestors.last %><span class="rule"></span></h1>
 			<% if knot.knot_content %><div class="abstract"><% knot.knot_content %></div><% end %>
 			<div class="byline">
@@ -101,7 +118,7 @@ body{overflow:hidden;}
 		</section>
 
 		<% slides = knot.knot_id.get_full_deck %>
-		<% i = 0 %>
+		<% i = show_mos ? 1 : 0 %>
 		<% FOREACH slide IN slides %>
 			<% i = i + 1 %>
 			<section class="folio" data-index="<% i %>" id="folio-<% slide.knot_id %>">

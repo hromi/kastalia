@@ -1,3 +1,57 @@
+# sanitize_knot_content: blocklist-style mitigation against stored XSS via
+# knot_content. This app's templates never HTML-escape output (confirmed
+# across the whole views/ tree) and knot_content is rendered raw on public
+# pages to every visitor, so any write path that didn't scrub it was a
+# straightforward stored-XSS vector for whoever could reach that write
+# (addKnot/ajax_update, both reachable by any logged-in account with no
+# ownership check on the target). knot_content is genuine rich WYSIWYG text
+# (tinymce) that real formatting (bold/italic/links/images/paragraphs)
+# depends on, so this intentionally does NOT strip all tags (that would be
+# a real behavior regression) -- it blocklists only the constructs that
+# actually execute script. This is defense-in-depth, not a guaranteed-
+# complete sanitizer (regex-based HTML scrubbing can be bypassed by a
+# sufficiently creative payload) -- the thorough fix is an allowlist
+# scrubber (e.g. HTML::Scrubber, not currently installed) plus making every
+# template escape output on render; that's a larger follow-up, not this.
+sub sanitize_knot_content {
+	my $html = shift;
+	return $html unless defined $html;
+	$html =~ s{<\s*script\b[^>]*>.*?<\s*/\s*script\s*>}{}gis;
+	$html =~ s{<\s*script\b[^>]*/?>}{}gis;
+	$html =~ s{<\s*(iframe|object|embed|style|link|meta|base)\b[^>]*>(?:.*?<\s*/\s*\1\s*>)?}{}gis;
+	$html =~ s{\s+on\w+\s*=\s*"[^"]*"}{}gis;
+	$html =~ s{\s+on\w+\s*=\s*'[^']*'}{}gis;
+	$html =~ s{\s+on\w+\s*=\s*[^\s>]+}{}gis;
+	$html =~ s{(href|src)\s*=\s*"\s*(?:javascript|data)\s*:[^"]*"}{$1="#"}gis;
+	$html =~ s{(href|src)\s*=\s*'\s*(?:javascript|data)\s*:[^']*'}{$1="#"}gis;
+	$html =~ s{(href|src)\s*=\s*(?:javascript|data)\s*:[^\s>]*}{$1="#"}gis;
+	return $html;
+}
+
+# is_safe_outbound_url: guards the one place this app makes a server-side
+# fetch of a URL that comes from an ordinary, attacker-settable knot
+# attribute (ogg_url, in the /audio/<id>.ogg route) -- without this, any
+# logged-in user could set ogg_url to e.g. http://127.0.0.1:<internal-port>/
+# or a cloud metadata address and have the SERVER itself make that request
+# (SSRF). Only http(s) to a hostname that resolves to a public address is
+# allowed; resolves the hostname (not just string-matches it) so a DNS name
+# that merely points at an internal address is still caught.
+sub is_safe_outbound_url {
+	my $url = shift;
+	return 0 unless defined $url && $url =~ m{^https?://([^/:]+)}i;
+	my $host = $1;
+	return 0 if $host =~ /^(?:localhost|127\.|0\.|10\.|192\.168\.|169\.254\.)/i;
+	return 0 if $host eq '::1' || $host =~ /^\[::1\]$/;
+	return 0 if $host =~ /^172\.(\d+)\./ && $1 >= 16 && $1 <= 31;
+	use Socket qw(inet_ntoa);
+	my $packed = gethostbyname($host);
+	return 0 unless $packed;
+	my $ip = inet_ntoa($packed);
+	return 0 if $ip =~ /^(?:127\.|10\.|192\.168\.|169\.254\.|0\.)/;
+	return 0 if $ip =~ /^172\.(\d+)\./ && $1 >= 16 && $1 <= 31;
+	return 1;
+}
+
 sub attach_attributes {
 	my $aref=shift;
 	for my $item (@$aref) {
@@ -45,9 +99,18 @@ sub upsertBound {
 sub addBound {
 	(my $sub, my $predicate, my $obj, my $ord) = @_;
 	$ord=1 if (!$ord);
-	my $sth=database('knots')->prepare('INSERT INTO bounds(sub,predicate,obj,ord, bound_creator) VALUES (?,?,?,?,?)');						
+	my $sth=database('knots')->prepare('INSERT INTO bounds(sub,predicate,obj,ord, bound_creator) VALUES (?,?,?,?,?)');
 	debug "ADDBOUND $sub $predicate $obj $ord".session('user_id');
-	$sth->execute($sub,$predicate,$obj,$ord,session('user_id'));
+	# RaiseError is off on this handle (see config.yml), so a failed INSERT
+	# (e.g. bound_creator pointing at a session user_id whose knot no longer
+	# exists -- a stale/ghost session) would otherwise be silently swallowed
+	# here: execute() just returns false, last_insert_id() below would still
+	# return a real-looking id (the bound_id sequence advances regardless of
+	# whether the row committed), and addZeitgeist() would log a fake
+	# "success" with that id -- exactly the shape of bug that cost real
+	# relations with no visible error. Die loud instead.
+	my $ok = $sth->execute($sub,$predicate,$obj,$ord,session('user_id'));
+	die "addBound($sub,$predicate,$obj) failed: ".$sth->errstr unless $ok;
 	my $bound_id = database('knots')->last_insert_id(undef,undef,undef,undef,{sequence=>'bound_id_seq'});
 	addZeitgeist(session('user_id'),'add_bound','post',{obj=>$obj, sub=>$sub, predicate=>$predicate,ord=>$ord,bound_id=>$bound_id});
 }
@@ -82,6 +145,7 @@ sub addZeitgeist {
 
 sub addKnot {
 	(my $knot_name, my $knot_content, my $attributes) = (@_);
+	$knot_content = sanitize_knot_content($knot_content);
 	if ((session('login'))) {
 		$attributes->{'creator'}=(session('login'));
 	}
@@ -94,7 +158,15 @@ sub addKnot {
 	
 	}
 	my $knot_id = database('knots')->last_insert_id(undef,undef,undef,undef,{sequence=>'knots_knot_id_seq'});
-	addAttribute($knot_id,'epoch',time);
+	# int(): TT.pm imports Time::HiRes's `time`, which shadows the builtin
+	# and returns a fractional-second float (e.g. 1791966705.37727) --
+	# stored as-is, that later crashes Template::Plugin::Date's format()
+	# (it parses its argument as a date STRING when it contains a '.', not
+	# as a raw epoch number, and chokes on the fractional part). epoch is
+	# conceptually a whole-second Unix timestamp everywhere else it's used
+	# (attach_attributes's localtime() silently truncated it, which is why
+	# this went unnoticed), so store it as one.
+	addAttribute($knot_id,'epoch',int(time));
 	addBound((session('user_id')),'created_by',$knot_id) if (session('user_id'));
 	return $knot_id;
 }
@@ -217,24 +289,27 @@ sub knotize_list {
 }
 
 sub login {
-	($login,$ajax)=shift;
+	(my $login, my $ajax) = @_;
 	debug("LOGIN IN ".$login);
 	session 'user'=>$login;
 	my $user_knot=get_first_knot_with_name($login);
+	my $user_id;
 	if ($user_knot->{knot_id}) {
-		session 'user_id' => $user_knot->{knot_id};
-		#server-side variables ... 
+		$user_id = $user_knot->{knot_id};
+		session 'user_id' => $user_id;
+		#server-side variables ...
 		for my $k ('zodiac','consent','gender','age','motherlang','voice','home_knot','collects','font','score','text_transform') {
 			#debug "$k $user_knot->{$k}";
 			session $k => $user_knot->{$k};
 		}
 	} else {
-		session 'user_id' => addKnot($l,"Profile of $l\n");	
+		$user_id = addKnot($login,"Profile of $login\n");
+		session 'user_id' => $user_id;
 	}
 	my $dispatch = session 'dispatch';
 	my $home_knot = session 'home_knot';
-	#debug "Logging in $l with ID ".$user_knot->{knot_id};
-	session 'bookmarks' => get_bookmarks($user_knot->{knot_id});
+	#debug "Logging in $login with ID ".$user_id;
+	session 'bookmarks' => get_bookmarks($user_id);
 	#my $shortlogin=$l;
 	session 'login' => $login;
 	$dispatch = params->{force_dispatch} if params->{force_dispatch};
