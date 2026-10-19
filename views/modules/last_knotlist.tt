@@ -1,0 +1,15 @@
+<% FOREACH knot IN knots%>
+<a href="/<%knot.knot_id%>" class="kgrid-card">
+	<% if knot.img_url %>
+		<img src="<%knot.img_url%>" loading="lazy"/>
+	<% elsif knot.screenshot_url %>
+		<img src="<%knot.screenshot_url%>" loading="lazy"/>
+	<% end %>
+	<div class="kgrid-body">
+		<div class="kgrid-title" title="<%knot.knot_name%>"><%knot.knot_name.short_path%></div>
+		<% if knot.knot_content %><div class="kgrid-snippet"><%knot.knot_content.remove_html_tags | truncate(160)%></div><% end %>
+		<% if knot.embed_url %><div class="kgrid-badge">&#128196; pdf</div><% end %>
+		<% if knot.video_url %><div class="kgrid-badge">&#127909; video</div><% end %>
+	</div>
+</a>
+<% END %>

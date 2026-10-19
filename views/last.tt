@@ -1,0 +1,52 @@
+<%use date%>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Last Knots</title>
+<% INCLUDE "modules/jquery_default.tt" %>
+<% INCLUDE modules/admin_skin.tt %>
+<style>
+*{box-sizing:border-box;}
+body{margin:0;line-height:1.5;font-size:15px;}
+.kwrap{max-width:1300px;margin:0 auto;padding:1rem;}
+.klist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;}
+.kgrid-card{display:block;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;color:var(--fg);}
+.kgrid-card:hover{border-color:var(--accent);}
+.kgrid-card img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;}
+.kgrid-body{padding:.6rem .7rem;}
+.kgrid-title{font-weight:600;font-size:.88rem;margin-bottom:.25rem;}
+.kgrid-snippet{color:var(--muted);font-size:.78rem;line-height:1.4;}
+.kgrid-badge{display:inline-block;margin-top:.3rem;font-size:.72rem;color:var(--muted);}
+</style>
+</head>
+<body data-skin="modern">
+	<div id="brahma">
+		<% INCLUDE "layouts/brahma.tt" %>
+	</div>
+
+	<header class="kadmin-topbar">
+		<strong>Last Knots</strong>
+		<button type="button" id="flip_last">Flip order</button>
+		<span style="margin-left:auto;"><% INCLUDE modules/admin_skin_picker.tt %></span>
+	</header>
+
+	<div class="kwrap">
+		<div id="last_list" class="klist-grid">
+			<% INCLUDE "modules/last_knotlist.tt" %>
+			<div id="scroll-sentinel"></div>
+		</div>
+	</div>
+
+	<% INCLUDE modules/infinite_scroll.tt url_base="/last/" page_size=42 list_selector="#last_list" row_selector="a.kgrid-card" %>
+	<script>
+	$('#flip_last').click(function(){
+		var list = $('#last_list');
+		var items = list.children('a');
+		list.append(items.get().reverse());
+		list.append($('#scroll-sentinel'));
+	});
+	</script>
+</body>
+</html>

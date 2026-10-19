@@ -1,0 +1,12 @@
+<% FOREACH bound IN bounds%>
+<li>
+	<span class="delete_bound" bid="<%bound.bound_id%>" title="destroy this relation">&#10060;</span>
+	<%if !bookmarks%>
+		<span class="when"><%bound.bound_created%></span>
+		<a href="/<%bound.sub_id%>" title="<%bound.sub_name%>"><%bound.sub_name.short_path%></a>
+		<span class="pred"><%bound.predicate%></span>
+	<%end%>
+	<a href="/<%bound.obj_id%>/knot" title="<%bound.obj_name%>"><%bound.obj_name.short_path%></a>
+	<span class="ord">(<%bound.ord%>)</span>
+</li>
+<% END %>

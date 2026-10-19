@@ -1,0 +1,48 @@
+<%use date%>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><% if bookmarks %>Bookmarks<% else %>Bounds<% end %></title>
+<% INCLUDE "modules/jquery_default.tt" %>
+<% INCLUDE modules/admin_skin.tt %>
+<style>
+*{box-sizing:border-box;}
+body{margin:0;line-height:1.5;font-size:15px;}
+.kwrap{max-width:1000px;margin:0 auto;padding:1rem;}
+.blist{list-style:none;margin:0;padding:0;}
+.blist li{display:flex;align-items:center;flex-wrap:wrap;gap:.35rem;border-bottom:1px solid var(--border);padding:.5rem 0;font-size:.88rem;}
+.blist li:last-child{border-bottom:0;}
+.blist .when{color:var(--muted);font-size:.76rem;}
+.blist .pred{color:var(--muted);font-style:italic;}
+.blist .ord{color:var(--muted);font-size:.8rem;margin-left:auto;}
+</style>
+</head>
+<body data-skin="modern">
+	<div id="brahma">
+		<% INCLUDE "layouts/brahma.tt" %>
+	</div>
+
+	<header class="kadmin-topbar">
+		<strong><% if bookmarks %>Bookmarks<% else %>Bounds<% end %></strong>
+		<span style="margin-left:auto;"><% INCLUDE modules/admin_skin_picker.tt %></span>
+	</header>
+
+	<div class="kwrap">
+		<div class="kcard">
+			<h2><%bounds.size%> <% if bookmarks %>bookmarks<% else %>bounds<% end %></h2>
+			<ul class="blist">
+				<% INCLUDE modules/bounds_list.tt %>
+				<% unless bookmarks %><li id="scroll-sentinel"></li><% end %>
+			</ul>
+		</div>
+	</div>
+
+	<% unless bookmarks %>
+		<% INCLUDE modules/infinite_scroll.tt url_base="/bounds/" page_size=100 list_selector=".blist" %>
+	<% end %>
+
+	<div id="shiva">
+		<% INCLUDE "modules/shiva.tt" %>
+	</div>

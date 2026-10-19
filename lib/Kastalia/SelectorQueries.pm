@@ -30,9 +30,13 @@ sub get_subtree {
 
 
 sub get_zeitgeist {
-	my $offset = shift;
-	my $sth=database('knots')->prepare("select zeitgeist.*,knot_name as agent from zeitgeist join knots on agent_id=knot_id order by action_executed desc limit 230");
-	$sth->execute();
+	# $offset used to be silently accepted and then ignored (the query had
+	# no OFFSET clause at all) -- now a row offset, so /zeitgeist/<n> can
+	# actually page past the first 230 instead of always returning the same
+	# ones, which is what infinite-scroll "load more" needs.
+	my $offset = shift || 0;
+	my $sth=database('knots')->prepare("select zeitgeist.*,knot_name as agent from zeitgeist join knots on agent_id=knot_id order by action_executed desc limit 230 offset ?");
+	$sth->execute($offset);
 	return $sth->fetchall_arrayref({});
 }
 sub get_last_knot_with_name {
@@ -78,10 +82,11 @@ sub get_first_knot_with_name {
 	return attach_attributes($aref)->[0];
 }
 sub get_bounds {
-	my $offset = shift;
+	# same fix as get_zeitgeist -- $offset was accepted and discarded before
+	my $offset = shift || 0;
 	my $sth=database('knots')->prepare("
-		select bound_id,subs.knot_name as sub_name, subs.knot_id as sub_id, objs.knot_name as obj_name, objs.knot_id as obj_id, predicate, bound_created,ord from bounds left join knots as subs on subs.knot_id=sub left join knots as objs on objs.knot_id=obj order by bound_created desc limit 100");
-	$sth->execute();
+		select bound_id,subs.knot_name as sub_name, subs.knot_id as sub_id, objs.knot_name as obj_name, objs.knot_id as obj_id, predicate, bound_created,ord from bounds left join knots as subs on subs.knot_id=sub left join knots as objs on objs.knot_id=obj order by bound_created desc limit 100 offset ?");
+	$sth->execute($offset);
 	return $sth->fetchall_arrayref({});
 }
 
@@ -124,7 +129,7 @@ sub get_search {
 
 
 sub get_last {
-	my $offset = shift;
+	my $offset = shift || 0;
 	my $sth=database('knots')->prepare("select knot_id, knot_name, substring(knot_content from 0 for 777) as knot_content,
 		attributes->'img_url' as img_url,
 		attributes->'embed_url' as embed_url,

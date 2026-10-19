@@ -93,17 +93,19 @@ hook before => sub {
 		session 'last_get_path' => $root_knot;
 	}
 
-	elsif (request->method eq 'GET' and request->path !~ '/login\/?/') {
-		session 'last_get_path' => request->path; 
+	# excludes background/API-style GETs that a page fires on its own (not
+	# real navigation) from ever becoming "where a POST should send you
+	# back to" -- /search_knots in particular fires on every autocomplete
+	# keystroke, so without this exclusion the very next form submit (e.g.
+	# "Establish Relation") redirects to a bare JSON endpoint instead of
+	# back to the knot you were actually on.
+	elsif (request->method eq 'GET' and request->path !~ m{^/(login|search_knots)/?}) {
+		session 'last_get_path' => request->path;
 	}
 	#debug "LASTGETPATH".(session 'last_get_path');
 	#debug request->path;
 	#debug request->host;
 	#debug request->referer;
-	#reset offset if not explicitely specified
-	if (request->path !~ m{n$}) {
-		session 'offset' => 0;
-	}
 	#debug 'REQREQ'.request->path;
 	#if (!session('user')) {
 	#	if (request->path=~m{/\d+}) {
@@ -421,19 +423,19 @@ get qr{/self/?(\w+)?} => sub {
 #	forward '/last';
 #};
 
-any ['get', 'post'] => qr{/last/?(n|p)?} => sub {
-	my ($ajax_direction) = splat;
-	my $offset = session 'offset';
-	$offset = 0 if !$offset;
-	$offset += 42 if $ajax_direction eq "n";
+any ['get', 'post'] => qr{/last/(\d+)?/?} => sub {
+	my ($offset) = splat;
 	my $knots=get_last($offset);
-	#my $attributes = Pg::hstore::decode($knots->{attributes});
-	#debug "LAST $offset";
-	session 'offset' => $offset;
 	my $user_id = session 'user_id';
 	my $msg = session 'msg';
 	my $err = session 'err';
-	$ajax_direction ? template 'modules/last_knotlist',{layout=>'no','knots'=>$knots,  msg => session 'msg', err => session 'err', user_id => $user_id } : template 'last',{user_id => $user_id, layout=>'no','knots'=>$knots,  msg => $msg, err => $err };
+	# an offset present means this is the infinite-scroll "load more" call
+	# (see last.tt's IntersectionObserver) -- respond with just the cards
+	# to append, not a whole page.
+	if ($offset) {
+		return template 'modules/last_knotlist',{layout=>'no','knots'=>$knots, msg => session 'msg', err => session 'err', user_id => $user_id };
+	}
+	template 'last',{user_id => $user_id, layout=>'no','knots'=>$knots,  msg => $msg, err => $err };
 };
 
 any ['get', 'post'] => qr{/search/(.*)/?} => sub {
@@ -600,17 +602,63 @@ my $zeitgeist = get_zeitgeist_by_knot($knot_id);
 #        template 'display', {layout=>'no','knot'=>$knot, 'a' => $attributes };
 #};
 
+# /search_knots/?q=... : lightweight JSON lookup backing the "Establish
+# Relation" autocomplete in knot.tt -- deliberately NOT get_search() (that's
+# a full-page, unlimited, raw-regex search over both knot_name AND
+# knot_content; fine for a deliberate search but wrong for a per-keystroke
+# call: no LIMIT means a common query could return thousands of rows, and an
+# unescaped regex means ordinary punctuation in a typed name -- parens,
+# dots -- can 500 instead of just matching literally). ILIKE substring match
+# on knot_name only, capped, shortest-name-first as a cheap "more specific
+# match" ordering.
+get qr{/search_knots/?} => sub {
+	header 'Content-Type' => 'application/json;charset=utf-8';
+	# ->utf8 is load-bearing, not cosmetic: plain ->encode() on a knot_name
+	# containing anything outside ASCII (an umlaut, an emoji someone put in
+	# a title...) leaves Perl's wide-character string as-is instead of
+	# serializing it to UTF-8 bytes, which silently corrupts the response
+	# the moment ANY row in the result matches that -- which is exactly why
+	# "Ursula" looked broken: nothing to do with Ursula herself, one of the
+	# other ~20 shortest matches for that substring happened to contain an
+	# emoji, and that one bad row poisoned the whole JSON array client-side.
+	if (!session('login')) {
+		status 403;
+		return JSON::XS->new->utf8->encode({error=>'Permission denied.'});
+	}
+	my $q = param('q');
+	return JSON::XS->new->utf8->encode([]) if (!defined($q) || length($q) < 2);
+	my $sth = database('knots')->prepare(
+		"select knot_id, knot_name from knots where knot_name ilike ? order by length(knot_name) asc limit 20"
+	);
+	$sth->execute('%'.$q.'%');
+	my @out;
+	for my $row (@{ $sth->fetchall_arrayref({}) }) {
+		(my $short = $row->{knot_name}) =~ s/^.*(?:\+\+|\/)//;
+		push @out, { id => $row->{knot_id}+0, name => $row->{knot_name}, short_name => $short };
+	}
+	return JSON::XS->new->utf8->encode(\@out);
+};
+
 get qr{/zeitgeist/(\d+)?/?} => sub {
-	my ($timestamp) = splat;
-	my $zeitgeist = get_zeitgeist($timestamp);
+	my ($offset) = splat;
+	my $zeitgeist = get_zeitgeist($offset);
+	# an offset present means this is the infinite-scroll "load more" call
+	# (see zeitgeist.tt's IntersectionObserver) -- respond with just the
+	# <li> rows to append, not a whole page.
+	if ($offset) {
+		return template 'modules/zeitgeist_list', {layout=>'no','zeitgeist'=>$zeitgeist};
+	}
 	my $user_id = session 'user_id';
 	template 'zeitgeist', {layout=>'no','zeitgeist'=>$zeitgeist,'user_id'=>$user_id};
 };
 
 get qr{/bounds/(\d+)?/?} => sub {
-	my ($timestamp) = splat;
+	my ($offset) = splat;
+	my $bounds = get_bounds($offset);
+	if ($offset) {
+		return template 'modules/bounds_list', {layout=>'no','bounds'=>$bounds,'bookmarks'=>0};
+	}
 	my $user_id = session 'user_id';
-	my $bounds = get_bounds($timestamp);
 	template 'bounds', {layout=>'no','bounds'=> $bounds, 'user_id'=>$user_id};
 };
 

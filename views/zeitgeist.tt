@@ -1,0 +1,46 @@
+<%use date%>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitgeist Log</title>
+<% INCLUDE "modules/jquery_default.tt" %>
+<% INCLUDE modules/admin_skin.tt %>
+<style>
+*{box-sizing:border-box;}
+body{margin:0;line-height:1.5;font-size:15px;}
+.kwrap{max-width:1000px;margin:0 auto;padding:1rem;}
+.zlist{list-style:none;margin:0;padding:0;}
+.zlist li{border-bottom:1px solid var(--border);padding:.55rem 0;font-size:.85rem;}
+.zlist li:last-child{border-bottom:0;}
+.zlist .when{color:var(--muted);font-size:.78rem;white-space:nowrap;}
+.zlist .agent{font-weight:600;}
+.zlist .what{color:var(--muted);}
+.zlist .vars{display:block;font-family:ui-monospace,"JetBrains Mono",monospace;font-size:.76rem;color:var(--muted);
+	margin-top:.2rem;word-break:break-word;background:var(--card);border-radius:6px;padding:.3rem .5rem;}
+</style>
+</head>
+<body data-skin="modern">
+	<div id="brahma">
+		<% INCLUDE "layouts/brahma.tt" %>
+	</div>
+
+	<header class="kadmin-topbar">
+		<strong>Zeitgeist Log</strong>
+		<span style="margin-left:auto;"><% INCLUDE modules/admin_skin_picker.tt %></span>
+	</header>
+
+	<div class="kwrap">
+		<div class="kcard">
+			<h2><%zeitgeist.size%> events</h2>
+			<ul class="zlist">
+				<% INCLUDE modules/zeitgeist_list.tt %>
+				<li id="scroll-sentinel"></li>
+			</ul>
+		</div>
+	</div>
+
+	<% INCLUDE modules/infinite_scroll.tt url_base="/zeitgeist/" page_size=230 list_selector=".zlist" %>
+</body>
+</html>

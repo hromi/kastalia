@@ -1,0 +1,8 @@
+<% FOREACH z IN zeitgeist%>
+<li>
+	<span class="when"><%z.action_executed%></span>
+	&middot; <span class="agent" title="<%z.agent%>"><%z.agent.short_path%></span>
+	executed <span class="what"><%z.method%> <%z.action%></span>
+	<span class="vars"><%z.vars%></span>
+</li>
+<% END %>

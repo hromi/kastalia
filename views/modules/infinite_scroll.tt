@@ -1,0 +1,47 @@
+<%#
+  Generic "load more when the bottom sentinel scrolls into view" --- used
+  by zeitgeist.tt, bounds.tt and last.tt. Expects, in the including
+  template:
+    - a container matching `list_selector`, containing the row elements
+    - a sentinel element with id="scroll-sentinel" as the LAST child of
+      that container (any tag -- a <li> for a <ul>, a <div> for a grid)
+    - a server route at `url_base` + <offset> that returns ONLY the next
+      batch of rows (no wrapping container), e.g. Main.pm's /zeitgeist/<n>,
+      /bounds/<n> and /last/<n> already branch into the matching
+      modules/*_list.tt partial for exactly this when an offset is given.
+  `row_selector` picks which elements in that response count as rows (so
+  blank text nodes from parseHTML don't get appended/counted) -- defaults
+  to 'li', pass e.g. "a.kgrid-card" for a card grid.
+  Stops permanently once a response comes back short of `page_size` (the
+  natural "that was the last page" signal) or empty, or if the browser has
+  no IntersectionObserver (old browser: you just get the first page,
+  nothing throws).
+%>
+<% row_selector = row_selector or 'li' %>
+<script>
+(function(){
+	var list = document.querySelector('<%list_selector%>');
+	var sentinel = document.getElementById('scroll-sentinel');
+	if (!list || !sentinel || !('IntersectionObserver' in window)) return;
+
+	var offset = <%page_size%>;
+	var pageSize = <%page_size%>;
+	var loading = false, done = false;
+
+	var observer = new IntersectionObserver(function(entries){
+		if (done || loading || !entries[0].isIntersecting) return;
+		loading = true;
+		$.get('<%url_base%>' + offset, function(html){
+			var rows = $.parseHTML(html);
+			var $rows = $(rows).filter('<%row_selector%>');
+			if (!$rows.length){ done = true; observer.disconnect(); loading = false; return; }
+			$rows.insertBefore(sentinel);
+			offset += pageSize;
+			loading = false;
+			if ($rows.length < pageSize){ done = true; observer.disconnect(); }
+		}).fail(function(){ loading = false; });
+	}, {rootMargin: '600px'});
+
+	observer.observe(sentinel);
+})();
+</script>
