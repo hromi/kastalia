@@ -1,0 +1,16 @@
+[Unit]
+Description=kastalia
+After=network.target
+
+[Service]
+# adjust /var/www/kastalia-kms below if you cloned this repo somewhere else
+ExecStart=/usr/local/bin/plackup -r -R /var/www/kastalia-kms/lib -s Starman --workers=9 --access-log /var/www/kastalia-kms/logs/access.log --error-log /var/www/kastalia-kms/logs/error.log -l /var/www/kastalia-kms/ca.sock -a /var/www/kastalia-kms/bin/app.psgi
+ExecStop=/usr/bin/pkill -f starman
+WorkingDirectory=/var/www/kastalia-kms
+Restart=on-failure
+User=kastalia
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target
+

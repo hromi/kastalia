@@ -1,0 +1,146 @@
+# Copy this file to config.yml and fill in the values below.
+#
+# config.yml is listed in .gitignore and MUST stay that way -- it holds
+# real credentials (ldap_pass, CAST_TOKEN_SECRET) and must never be
+# committed. If you ever see `git status` offer to add config.yml, stop
+# and check your .gitignore before proceeding.
+
+# Your application's name
+appname: "Kastalia KMS"
+environment: "production"
+
+# The default layout to use for your application (located in
+# views/layouts/main.tt)
+layout: "main"
+
+# when the charset is set to UTF-8 Dancer2 will handle for you
+# all the magic of encoding and decoding. You should not care
+# about unicode within your app when this setting is set (recommended).
+charset: "UTF-8"
+
+logger: 'file'
+log: 'error'
+
+session: Memcached
+
+template: "template_toolkit"
+engines:
+ template:
+  template_toolkit:
+   start_tag: '<%'
+   end_tag:   '%>'
+   # lets Template::Plugin::JSON's `| json` filter be used unqualified
+   # in views (e.g. modules/infinite_scroll.tt does not need this, but
+   # some older templates assume it)
+   PLUGIN_BASE: 'Template::Plugin::JSON'
+ session:
+    Memcached:
+      memcached_servers:
+        - 127.0.0.1:11211
+      # every real deployment of this app should be HTTPS-only -- keep
+      # these two once you've confirmed nginx (or whatever's in front)
+      # redirects all plain-http traffic to https. is_http_only is
+      # already Dancer2's own default (HttpOnly is always sent).
+      is_secure: 1
+      cookie_same_site: 'Lax'
+
+plugins:
+ Ajax:
+  content_type: 'application/json'
+ Database:
+  connections:
+   knots:
+      driver: 'Pg'
+      database: 'kastalia_db'
+      dbi_params:
+        RaiseError: 0
+        PrintError: 0
+        AutoCommit: 1
+        pg_enable_utf8: 1
+
+# knot_id of the knot every "/" request resolves to when the requesting
+# domain isn't found in `host:` below
+main_route: '/1'
+
+show_errors: 1
+
+# exact login names (NOT a substring/regex -- this is matched as
+# /^(?:account_admins)$/, so pipe-separate exact names only) allowed to
+# create new LDAP accounts and force-reset other users' passwords via
+# /user_constructor and /user_resetpwd. Keep this short.
+account_admins: 'root|your-admin-login'
+
+# --- LDAP ---------------------------------------------------------------
+# this app supports binding against up to two LDAP organizational units
+# (e.g. one per community/domain sharing this install) -- login tries
+# ldap_ou1 first, falling back to ldap_ou2 if that bind fails.
+ldap_host: '127.0.0.1'
+ldap_base: 'dc=example,dc=org'
+ldap_bind_cn: 'cn=admin'
+ldap_pass: 'CHANGE-ME-this-is-a-real-secret'
+ldap_ou1: 'ou=people'
+ldap_domain1: 'example.org'
+ldap_label1: 'example.org'
+# second OU is optional -- if you only run one community, you can still
+# set ldap_ou2/ldap_domain2/ldap_label2 to the same values as *1, or leave
+# them unset (the code falls back to attempting the 2nd bind regardless;
+# it'll just fail harmlessly if that OU doesn't exist).
+ldap_ou2: 'ou=people'
+ldap_domain2: 'example.org'
+ldap_label2: 'example.org'
+
+mail_smtp_host: 'smtp.example.org'
+mail_smtp_port: 587
+
+# --- classroom cast (optional) ------------------------------------------
+# shared secret (HMAC) between this app and teacher.py's /ws relay
+# (/var/www/wizzion2/teacher/teacher.py in production -- not part of this
+# repo), used by /api/cast_token/. Only needed if you're using mainframe.tt
+# / kolleg.tt's live classroom-cast feature. Must match teacher-cast's own
+# CAST_TOKEN_SECRET environment variable exactly (see its systemd unit).
+# Generate one with: openssl rand -hex 32
+# Leaving this unset disables casting-as-teacher entirely (fails closed) --
+# that's safe, just means no one can start a live cast.
+CAST_TOKEN_SECRET: 'CHANGE-ME-generate-with-openssl-rand--hex-32'
+
+# --- voice-auth (optional, likely unused) -------------------------------
+# shared secret with an external voice-recognition microservice that can
+# log a visitor in by voice match (see API.pm's /api/auth/ and
+# views/modules/js_mikroserver_client.js). Leave unset unless you actually
+# run that external service -- unset means /api/auth/ fails closed (it
+# used to silently treat "unset" as "the secret is an empty string", which
+# was a full authentication bypass; that's fixed, but the safe state is
+# still simply "don't set this unless you need it").
+#VOICEAUTH_SEED: ''
+
+# host to proxy transcription/segmentation requests to, used by
+# /speech_segment/ (utils/segment_audio.py) -- optional, only needed if
+# you use that feature.
+#mikroserver_host: ''
+
+# knot_id of the page /auth forwards to (a login/voice-auth landing knot) --
+# optional, only needed if you use the /auth + /api/auth/ voice-login flow.
+#AUTH_KNOT: ''
+
+APPURL: 'https://example.org'
+# which template a knot renders with when it has no `template` attribute
+# of its own
+DEFAULT_TEMPLATE: 'knot'
+KASTALIA_DIR: '/var/www/kastalia-kms/'
+
+# host: maps each domain this install serves to the knot_id that domain's
+# "/" resolves to (its root knot). Add one line per domain you configure
+# in nginx.
+host:
+ example.org: 1
+
+# domain_template: each domain's own canonical, distinct way of viewing
+# the knowledge graph. Requesting any knot with a literal ".html" suffix
+# on a given domain always renders that domain's entry here, regardless of
+# the knot's own stored `template` attribute -- see Main.pm's
+# canonical_domain_template(). Pick any template name under views/ (this
+# repo ships several ready-made ones: console, treehouse, arena, samizdat,
+# ledger, offgrid, voyage, atlas, network, greenhouse). Optional -- a
+# domain missing from this section just has no ".html" canonical view.
+domain_template:
+ example.org: 'console'
