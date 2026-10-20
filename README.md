@@ -122,6 +122,20 @@ cast routes fail closed (no one can start a cast), which is safe.
 - **`account_admins`** (config.yml) is matched as an *exact* login name,
   pipe-separated (`root|alice|bob`) — not a substring and not a regex
   pattern you should get creative with.
+- **Credential rotation log** (dates only — never put real values here):
+  - 2026-10-20: `ldap_pass` (the `cn=admin` LDAP bind password) and
+    `VOICEAUTH_SEED` rotated, as part of the 2026 security audit. The old
+    `ldap_pass` had been sitting in plaintext in a couple of other
+    root-owned scratch files on the reference deployment, unrelated to
+    this repo, since before this audit — if you're setting up a new
+    install from scratch this doesn't affect you, but if you're the admin
+    of the reference deployment and find another copy of the old value
+    lying around somewhere, it's stale and safe to delete.
+    `VOICEAUTH_SEED` had never actually been set before (see the
+    VOICEAUTH_SEED note in `config_template.yml`) -- rotating it here just
+    means it's now a real value instead of empty; the voice-login feature
+    itself still needs that same value handed to whichever external
+    service uses it before it does anything.
 - **Every route that shells out** (ffmpeg/opusenc/wget/curl/tesseract/
   identify) does so with `String::ShellQuote` around any value that isn't
   a compile-time literal. If you add a new one, quote it the same way —
